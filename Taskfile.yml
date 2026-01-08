@@ -1,0 +1,101 @@
+version: '3'
+
+vars:
+  SERVICE_NAME: TicketServicio
+  SERVICE_NAME_TEST: TicketServicioTest
+  BINARY_NAME: TicketServicio.exe
+  BUILD_DIR: ./bin
+
+tasks:
+  default:
+    desc: Build for development (test environment)
+    cmds:
+      - task: build-test
+
+  build-test:
+    desc: Build for test/development environment
+    cmds:
+      - go build -ldflags "-X github.com/adcondev/ticket-daemon/internal/daemon. BuildEnvironment=test -X github.com/adcondev/ticket-daemon/internal/daemon.BuildDate={{.DATE}} -X github.com/adcondev/ticket-daemon/internal/daemon.BuildTime={{.TIME}}" -o {{.BUILD_DIR}}/{{. BINARY_NAME}} ./cmd/ticketd
+    vars:
+      DATE:
+        sh: date +%Y-%m-%d
+      TIME:
+        sh: date +%H:%M:%S
+
+  build-prod:
+    desc: Build for production environment
+    cmds:
+      - go build -ldflags "-X github.com/adcondev/ticket-daemon/internal/daemon.BuildEnvironment=prod -X github. com/adcondev/ticket-daemon/internal/daemon.BuildDate={{.DATE}} -X github.com/adcondev/ticket-daemon/internal/daemon.BuildTime={{.TIME}}" -o {{.BUILD_DIR}}/{{.BINARY_NAME}} ./cmd/ticketd
+    vars:
+      DATE:
+        sh: date +%Y-%m-%d
+      TIME:
+        sh: date +%H:%M:%S
+
+  run:
+    desc: Build and run in test mode
+    deps: [ build-test ]
+    cmds:
+      - "{{.BUILD_DIR}}/{{. BINARY_NAME}}"
+
+  install-test:
+    desc: Install as Windows Service (test)
+    deps: [ build-test ]
+    cmds:
+      - sc create {{.SERVICE_NAME_TEST}} binPath= "{{.PWD}}\\{{.BUILD_DIR}}\\{{.BINARY_NAME}}" start= auto
+      - sc description {{.SERVICE_NAME_TEST}} "Ticket Daemon WebSocket Service (Test)"
+    vars:
+      PWD:
+        sh: pwd
+
+  install-prod:
+    desc: Install as Windows Service (production)
+    deps: [ build-prod ]
+    cmds:
+      - sc create {{.SERVICE_NAME}} binPath= "{{.PWD}}\\{{.BUILD_DIR}}\\{{. BINARY_NAME}}" start= auto
+      - sc description {{.SERVICE_NAME}} "Ticket Daemon WebSocket Service"
+    vars:
+      PWD:
+        sh: pwd
+
+  uninstall-test:
+    desc: Uninstall test Windows Service
+    cmds:
+      - sc stop {{.SERVICE_NAME_TEST}}
+      - sc delete {{.SERVICE_NAME_TEST}}
+
+  uninstall-prod:
+    desc: Uninstall production Windows Service
+    cmds:
+      - sc stop {{.SERVICE_NAME}}
+      - sc delete {{. SERVICE_NAME}}
+
+  start:
+    desc: Start the service
+    cmds:
+      - sc start {{.SERVICE_NAME_TEST}}
+
+  stop:
+    desc: Stop the service
+    cmds:
+      - sc stop {{.SERVICE_NAME_TEST}}
+
+  logs:
+    desc: Tail the log file
+    cmds:
+      - powershell Get-Content "$env:PROGRAMDATA\{{.SERVICE_NAME_TEST}}\{{.SERVICE_NAME_TEST}}. log" -Tail 50 -Wait
+
+  clean:
+    desc: Clean build artifacts
+    cmds:
+      - rm -rf {{. BUILD_DIR}}
+
+  lint:
+    desc: Run linter
+    cmds:
+      - golangci-lint run ./...
+
+  test:
+    desc: Run tests
+    cmds:
+      - go test -v ./...

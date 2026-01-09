@@ -14,6 +14,7 @@ import (
 	"github.com/judwhite/go-svc"
 
 	"github.com/adcondev/ticket-daemon/internal/server"
+	"github.com/adcondev/ticket-daemon/internal/worker"
 )
 
 // Build variables, injected at compile time
@@ -30,24 +31,27 @@ const (
 
 // EnvironmentConfig holds environment-specific configuration
 type EnvironmentConfig struct {
-	Name        string
-	ServiceName string
-	ListenAddr  string
-	Verbose     bool
+	Name           string
+	ServiceName    string
+	ListenAddr     string
+	Verbose        bool
+	DefaultPrinter string
 }
 
 var envConfigs = map[string]EnvironmentConfig{
 	"prod": {
-		Name:        "PRODUCCIÓN",
-		ServiceName: serviceName,
-		ListenAddr:  "0.0.0.0:8766",
-		Verbose:     false,
+		Name:           "PRODUCCIÓN",
+		ServiceName:    serviceName,
+		ListenAddr:     "0.0.0.0:8766",
+		Verbose:        false,
+		DefaultPrinter: "", // Must be specified in document
 	},
 	"test": {
-		Name:        "TEST/DEV",
-		ServiceName: serviceNameTest,
-		ListenAddr:  "localhost:8766",
-		Verbose:     true,
+		Name:           "TEST/DEV",
+		ServiceName:    serviceNameTest,
+		ListenAddr:     "localhost:8766",
+		Verbose:        true,
+		DefaultPrinter: "80mm EC-PM-80250", // Default for testing
 	},
 }
 
@@ -61,10 +65,11 @@ func GetEnvConfig() EnvironmentConfig {
 
 // Program implements svc.Service interface
 type Program struct {
-	wg         sync.WaitGroup
-	quit       chan struct{}
-	httpServer *http.Server
-	wsServer   *server.Server
+	wg          sync.WaitGroup
+	quit        chan struct{}
+	httpServer  *http.Server
+	wsServer    *server.Server
+	printWorker *worker.Worker
 }
 
 // Init initializes the service (logging, directories, etc.)
@@ -76,6 +81,9 @@ func (p *Program) Init(env svc.Environment) error {
 		return fmt.Errorf("failed to initialize logging: %w", err)
 	}
 
+	log.Println("╔════════════════════════════════════════════════════════════╗")
+	log.Println("║   TICKET DAEMON - Servicio de Impresión POS               ║")
+	log.Println("╚════════════════════════════════════════════════════════════╝")
 	log.Printf("[i] Iniciando Servicio - Ambiente: %s", envConfig.Name)
 	log.Printf("[i] Build: %s %s", BuildDate, BuildTime)
 
@@ -92,6 +100,18 @@ func (p *Program) Start() error {
 		QueueSize: 100,
 	})
 
+	// Initialize print worker
+	p.printWorker = worker.NewWorker(
+		p.wsServer.JobQueue(),
+		p.wsServer,
+		worker.Config{
+			DefaultPrinter: envConfig.DefaultPrinter,
+		},
+	)
+
+	// Start worker
+	p.printWorker.Start()
+
 	// Create HTTP server
 	mux := http.NewServeMux()
 
@@ -101,8 +121,10 @@ func (p *Program) Start() error {
 	// Health check endpoint
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		current, capacity := p.wsServer.QueueStatus()
+		workerStats := p.printWorker.Stats()
 		w.Header().Set("Content-Type", "application/json")
-		fmt.Fprintf(w, `{"status":"ok","queue": {"current":%d,"capacity":%d}}`, current, capacity)
+		fmt.Fprintf(w, `{"status":"ok","queue": {"current":%d,"capacity":%d},"worker":{"running":%t}}`,
+			current, capacity, workerStats.IsRunning)
 	})
 
 	// Static files for test client
@@ -124,6 +146,7 @@ func (p *Program) Start() error {
 		log.Printf("[i] Build: %s %s", BuildDate, BuildTime)
 		log.Printf("[i] WebSocket activo en ws://%s/ws", envConfig.ListenAddr)
 		log.Printf("[i] Health check en http://%s/health", envConfig.ListenAddr)
+		log.Printf("[i] Impresora por defecto: %s", defaultOrNone(envConfig.DefaultPrinter))
 
 		if err := p.httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Printf("[X] Error al iniciar servidor HTTP: %v", err)
@@ -136,6 +159,11 @@ func (p *Program) Start() error {
 // Stop stops the service gracefully
 func (p *Program) Stop() error {
 	log.Println("[.] Servicio deteniéndose...")
+
+	// Stop worker first (drain queue or timeout)
+	if p.printWorker != nil {
+		p.printWorker.Stop()
+	}
 
 	// Graceful shutdown with timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -175,8 +203,15 @@ func initLogging(envConfig EnvironmentConfig) error {
 		return err
 	}
 
-	log.Printf("[i] Logs en:  %s", logPath)
+	log.Printf("[i] Logs en: %s", logPath)
 	log.Printf("[i] Verbose: %v", envConfig.Verbose)
 
 	return nil
+}
+
+func defaultOrNone(s string) string {
+	if s == "" {
+		return "(ninguna - debe especificarse en documento)"
+	}
+	return s
 }

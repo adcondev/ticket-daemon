@@ -23,7 +23,7 @@ type Config struct {
 type PrintJob struct {
 	ID         string          `json:"id"`
 	ClientConn *websocket.Conn `json:"-"`
-	Document   json.RawMessage `json:"data"`
+	Document   json.RawMessage `json:"datos"`
 	ReceivedAt time.Time       `json:"received_at"`
 }
 
@@ -31,7 +31,7 @@ type PrintJob struct {
 type Message struct {
 	Tipo  string          `json:"tipo"`
 	ID    string          `json:"id,omitempty"`
-	Datos json.RawMessage `json:"data,omitempty"`
+	Datos json.RawMessage `json:"datos,omitempty"`
 }
 
 // Response represents outgoing WebSocket message

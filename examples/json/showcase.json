@@ -1,182 +1,5 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ticket Daemon - Test Client</title>
-    <style>
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
-
-        body {
-            font-family: 'Segoe UI', system-ui, sans-serif;
-            background: #1a1a2e;
-            color: #eee;
-            padding: 20px;
-            min-height: 100vh;
-        }
-
-        .container {
-            max-width: 900px;
-            margin: 0 auto;
-        }
-
-        h1 {
-            color: #00d4ff;
-            margin-bottom: 20px;
-        }
-
-        .status-bar {
-            display: flex;
-            gap: 20px;
-            background: #16213e;
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-        }
-
-        .status-item {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .status-dot {
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-            background: #ff4444;
-        }
-
-        .status-dot.connected {
-            background: #44ff44;
-        }
-
-        .panel {
-            background: #16213e;
-            border-radius: 8px;
-            padding: 20px;
-            margin-bottom: 20px;
-        }
-
-        .panel h2 {
-            color: #00d4ff;
-            margin-bottom: 15px;
-            font-size: 1.2rem;
-        }
-
-        textarea {
-            width: 100%;
-            height: 200px;
-            background: #0f0f23;
-            border: 1px solid #333;
-            color: #fff;
-            font-family: 'Consolas', monospace;
-            padding: 10px;
-            border-radius: 4px;
-            resize: vertical;
-        }
-
-        button {
-            background: #00d4ff;
-            color: #000;
-            border: none;
-            padding: 12px 24px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-weight: bold;
-            margin-right: 10px;
-            margin-top: 10px;
-        }
-
-        button:hover {
-            background: #00a0cc;
-        }
-
-        button:disabled {
-            background: #666;
-            cursor: not-allowed;
-        }
-
-        button.secondary {
-            background: #444;
-            color: #fff;
-        }
-
-        button.secondary:hover {
-            background: #555;
-        }
-
-        .log {
-            background: #0f0f23;
-            border: 1px solid #333;
-            border-radius: 4px;
-            padding: 15px;
-            height: 300px;
-            overflow-y: auto;
-            font-family: 'Consolas', monospace;
-            font-size: 13px;
-        }
-
-        .log-entry {
-            margin-bottom: 5px;
-            border-bottom: 1px solid #222;
-            padding-bottom: 5px;
-        }
-
-        .log-time {
-            color: #666;
-        }
-
-        .log-type {
-            font-weight: bold;
-        }
-
-        .log-type.info {
-            color: #00d4ff;
-        }
-
-        .log-type.ack {
-            color: #44ff44;
-        }
-
-        .log-type.result {
-            color: #ffff44;
-        }
-
-        .log-type.error {
-            color: #ff4444;
-        }
-
-        .log-type.sent {
-            color: #ff44ff;
-        }
-    </style>
-</head>
-<body>
-<div class="container">
-    <h1>🎫 Ticket Daemon - Test Client</h1>
-
-    <div class="status-bar">
-        <div class="status-item">
-            <div class="status-dot" id="statusDot"></div>
-            <span id="statusText">Desconectado</span>
-        </div>
-        <div class="status-item">
-            <span>Cola: <strong id="queueStatus">-/-</strong></span>
-        </div>
-        <div class="status-item">
-            <span>Clientes: <strong id="clientCount">-</strong></span>
-        </div>
-    </div>
-
-    <div class="panel">
-        <h2>📄 Documento JSON (Formato Poster)</h2>
-        <textarea id="jsonInput">{
-  "version": "1.0",
+{
+  "version": "1.1",
   "profile": {
     "model": "58mm PT-210",
     "paper_width": 58,
@@ -193,11 +16,16 @@
     },
     {
       "type": "pulse",
-      "data": { "pin": 0 }
+      "data": {
+        "pin": 0
+      }
     },
     {
       "type": "beep",
-      "data": { "times": 1, "lapse": 1 }
+      "data": {
+        "times": 1,
+        "lapse": 1
+      }
     },
     {
       "type": "image",
@@ -212,7 +40,11 @@
       "data": {
         "content": {
           "text": "KEMPER URGATE",
-          "content_style": { "align": "center", "bold": true, "size": "2x2" }
+          "content_style": {
+            "align": "center",
+            "bold": true,
+            "size": "2x2"
+          }
         },
         "new_line": true
       }
@@ -220,51 +52,96 @@
     {
       "type": "text",
       "data": {
-        "content": { "text": "RFC: EKU9003173C9", "align": "center" },
+        "content": {
+          "text": "RFC: EKU9003173C9",
+          "align": "center"
+        },
         "new_line": true
       }
     },
     {
       "type": "separator",
-      "data": { "char": "-", "length": 32 }
-    },
-    {
-      "type": "text",
       "data": {
-        "label": { "text": "Folio", "label_style": { "bold": true } },
-        "content": { "text": "0002" }
+        "char": "-",
+        "length": 32
       }
     },
     {
       "type": "text",
       "data": {
-        "label": { "text": "Fecha", "label_style": { "bold": true } },
-        "content": { "text": "2025-11-19 14:53" }
+        "label": {
+          "text": "Folio",
+          "label_style": {
+            "bold": true
+          }
+        },
+        "content": {
+          "text": "0002"
+        }
+      }
+    },
+    {
+      "type": "text",
+      "data": {
+        "label": {
+          "text": "Fecha",
+          "label_style": {
+            "bold": true
+          }
+        },
+        "content": {
+          "text": "2025-11-19 14:53"
+        }
       }
     },
     {
       "type": "separator",
-      "data": { "char": ".", "length": 32 }
+      "data": {
+        "char": ".",
+        "length": 32
+      }
     },
     {
       "type": "table",
       "data": {
         "definition": {
           "columns": [
-            { "name": "Cant", "width": 4, "align": "left" },
-            { "name": "Producto", "width": 16, "align": "center" },
-            { "name": "Total", "width": 10, "align": "right" }
+            {
+              "name": "Cant",
+              "width": 4,
+              "align": "left"
+            },
+            {
+              "name": "Producto",
+              "width": 16,
+              "align": "center"
+            },
+            {
+              "name": "Total",
+              "width": 10,
+              "align": "right"
+            }
           ]
         },
         "rows": [
-          ["1.0", "MALETIN", "$1,060.00"]
+          [
+            "1.0",
+            "MALETIN",
+            "$1,060.00"
+          ]
         ],
-        "options": { "header_bold": true, "column_spacing": 1 }
+        "options": {
+          "header_bold": true,
+          "column_spacing": 1
+        }
       }
     },
     {
       "type": "separator",
-      "data": { "char": "-", "length": 32 }
+      "data": {
+        "char": "-",
+        "length": 32
+      }
     },
     {
       "type": "text",
@@ -272,13 +149,17 @@
         "content": {
           "text": "TOTAL: $1,060.00 MXN",
           "align": "right",
-          "content_style": { "bold": true }
+          "content_style": {
+            "bold": true
+          }
         }
       }
     },
     {
       "type": "feed",
-      "data": { "lines": 1 }
+      "data": {
+        "lines": 1
+      }
     },
     {
       "type": "barcode",
@@ -292,7 +173,9 @@
     },
     {
       "type": "feed",
-      "data": { "lines": 1 }
+      "data": {
+        "lines": 1
+      }
     },
     {
       "type": "qr",
@@ -305,7 +188,9 @@
     },
     {
       "type": "feed",
-      "data": { "lines": 1 }
+      "data": {
+        "lines": 1
+      }
     },
     {
       "type": "text",
@@ -313,126 +198,25 @@
         "content": {
           "text": "GRACIAS POR SU COMPRA",
           "align": "center",
-          "content_style": { "bold": true, "inverse": true }
+          "content_style": {
+            "bold": true,
+            "inverse": true
+          }
         }
       }
     },
     {
       "type": "feed",
-      "data": { "lines": 1 }
+      "data": {
+        "lines": 1
+      }
     },
     {
       "type": "cut",
-      "data": { "mode": "partial", "feed": 0 }
+      "data": {
+        "mode": "partial",
+        "feed": 0
+      }
     }
   ]
-}</textarea>
-        <button id="btnSend">📤 Enviar Ticket</button>
-        <button id="btnStatus" class="secondary">📊 Estado Cola</button>
-        <button id="btnPing" class="secondary">🏓 Ping</button>
-        <button id="btnClear" class="secondary">🗑️ Limpiar Log</button>
-    </div>
-
-    <div class="panel">
-        <h2>📋 Log de Mensajes</h2>
-        <div class="log" id="logContainer"></div>
-    </div>
-</div>
-
-<script>
-    const wsUrl = `ws://${window.location.hostname}:8766/ws`;
-    let socket = null;
-    let isConnected = false;
-
-    function updateStatus(connected) {
-        isConnected = connected;
-        document.getElementById('statusDot').classList.toggle('connected', connected);
-        document.getElementById('statusText').textContent = connected ? 'Conectado' : 'Desconectado';
-        document.getElementById('btnSend').disabled = !connected;
-    }
-
-    function addLog(type, message) {
-        const container = document.getElementById('logContainer');
-        const time = new Date().toLocaleTimeString();
-        const entry = document.createElement('div');
-        entry.className = 'log-entry';
-        entry.innerHTML = `<span class="log-time">[${time}]</span> <span class="log-type ${type}">${type.toUpperCase()}</span>:  ${escapeHtml(message)}`;
-        container.appendChild(entry);
-        container.scrollTop = container.scrollHeight;
-    }
-
-    function escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-    }
-
-    function connect() {
-        socket = new WebSocket(wsUrl);
-
-        socket.onopen = () => {
-            updateStatus(true);
-            addLog('info', 'Conexión establecida');
-        };
-
-        socket.onmessage = (event) => {
-            try {
-                const data = JSON.parse(event.data);
-                addLog(data.tipo || 'message', JSON.stringify(data));
-
-                if (data.position !== undefined) {
-                    document.getElementById('queueStatus').textContent = data.position + '/100';
-                }
-            } catch (e) {
-                addLog('message', event.data);
-            }
-        };
-
-        socket.onclose = () => {
-            updateStatus(false);
-            addLog('info', 'Conexión cerrada, reconectando...');
-            setTimeout(connect, 3000);
-        };
-
-        socket.onerror = (err) => {
-            addLog('error', 'Error de conexión');
-        };
-    }
-
-    document.getElementById('btnSend').addEventListener('click', () => {
-        if (!socket || !isConnected) return;
-
-        try {
-            const jsonData = JSON.parse(document.getElementById('jsonInput').value);
-            const message = {
-                tipo: 'ticket',
-                id: 'test-' + Date.now(),
-                datos: jsonData
-            };
-            socket.send(JSON.stringify(message));
-            addLog('sent', 'Ticket enviado:  ' + message.id);
-        } catch (e) {
-            addLog('error', 'JSON inválido:  ' + e.message);
-        }
-    });
-
-    document.getElementById('btnStatus').addEventListener('click', () => {
-        if (!socket || !isConnected) return;
-        socket.send(JSON.stringify({tipo: 'status'}));
-        addLog('sent', 'Solicitud de estado');
-    });
-
-    document.getElementById('btnPing').addEventListener('click', () => {
-        if (!socket || !isConnected) return;
-        socket.send(JSON.stringify({tipo: 'ping', id: 'ping-' + Date.now()}));
-        addLog('sent', 'Ping enviado');
-    });
-
-    document.getElementById('btnClear').addEventListener('click', () => {
-        document.getElementById('logContainer').innerHTML = '';
-    });
-
-    connect();
-</script>
-</body>
-</html>
+}

@@ -32,13 +32,16 @@ type ClientNotifier interface {
 
 // Worker consumes print jobs from the queue and executes them via Poster
 type Worker struct {
-	jobQueue  <-chan *server.PrintJob
-	notifier  ClientNotifier
-	config    Config
-	stopChan  chan struct{}
-	wg        sync.WaitGroup
-	mu        sync.Mutex // Serialize printer operations (safety)
-	isRunning bool
+	jobQueue      <-chan *server.PrintJob
+	notifier      ClientNotifier
+	config        Config
+	stopChan      chan struct{}
+	wg            sync.WaitGroup
+	mu            sync.Mutex
+	isRunning     bool
+	jobsProcessed int64
+	jobsFailed    int64
+	lastJobTime   time.Time
 }
 
 // NewWorker creates a new print worker
@@ -64,7 +67,7 @@ func (w *Worker) Start() {
 	w.wg.Add(1)
 	go w.run()
 
-	log.Println("[OK] Worker de impresión iniciado")
+	log.Println("[WORKER] ✅ Print worker started and ready")
 }
 
 // Stop gracefully stops the worker
@@ -80,24 +83,24 @@ func (w *Worker) Stop() {
 	close(w.stopChan)
 	w.wg.Wait()
 
-	log.Println("[OK] Worker de impresión detenido")
+	log.Printf("[WORKER] 🛑 Print worker stopped (processed:  %d, failed:  %d)", w.jobsProcessed, w.jobsFailed)
 }
 
 // run is the main worker loop
 func (w *Worker) run() {
 	defer w.wg.Done()
 
-	log.Println("[i] Worker esperando trabajos de impresión...")
+	log.Println("[WORKER] 👂 Waiting for print jobs...")
 
 	for {
 		select {
 		case <-w.stopChan:
-			log.Println("[i] Worker recibió señal de parada")
+			log.Println("[WORKER] 📴 Received stop signal")
 			return
 
 		case job, ok := <-w.jobQueue:
 			if !ok {
-				log.Println("[i] Canal de trabajos cerrado, terminando worker")
+				log.Println("[WORKER] 📴 Job channel closed, exiting")
 				return
 			}
 			w.processJob(job)
@@ -108,39 +111,131 @@ func (w *Worker) run() {
 // processJob handles a single print job
 func (w *Worker) processJob(job *server.PrintJob) {
 	startTime := time.Now()
-	log.Printf("[>] Procesando job: %s", job.ID)
+	log.Printf("[WORKER] 🔄 Processing job:  %s", job.ID)
 
 	// Process the job
 	err := w.executePrint(job)
 
 	duration := time.Since(startTime)
+	w.lastJobTime = time.Now()
+
+	// Update statistics
+	w.mu.Lock()
+	if err != nil {
+		w.jobsFailed++
+	} else {
+		w.jobsProcessed++
+	}
+	w.mu.Unlock()
 
 	// Prepare response
 	var response server.Response
 	if err != nil {
-		log.Printf("[X] Error en job %s: %v (duración: %v)", job.ID, err, duration)
+		// Log detailed error to file for debugging
+		log.Printf("[WORKER] ❌ Job %s FAILED after %v:  %v", job.ID, duration, err)
+
+		// Extract user-friendly error message
+		errorMsg := extractUserFriendlyError(err)
+
 		response = server.Response{
 			Tipo:    "result",
 			ID:      job.ID,
 			Status:  "error",
-			Mensaje: fmt.Sprintf("Error de impresión: %v", err),
+			Mensaje: errorMsg,
 		}
 	} else {
-		log.Printf("[OK] Job %s completado exitosamente (duración: %v)", job.ID, duration)
+		log.Printf("[WORKER] ✅ Job %s completed in %v", job.ID, duration)
 		response = server.Response{
 			Tipo:    "result",
 			ID:      job.ID,
 			Status:  "success",
-			Mensaje: "Impresión completada",
+			Mensaje: fmt.Sprintf("Print completed in %v", duration.Round(time.Millisecond)),
 		}
 	}
 
 	// Notify client
 	if job.ClientConn != nil && w.notifier != nil {
 		if err := w.notifier.NotifyClient(job.ClientConn, response); err != nil {
-			log.Printf("[! ] Error notificando cliente para job %s: %v", job.ID, err)
+			log.Printf("[WORKER] ⚠️ Failed to notify client for job %s: %v", job.ID, err)
 		}
 	}
+}
+
+// extractUserFriendlyError creates a clean error message for the UI
+func extractUserFriendlyError(err error) string {
+	errStr := err.Error()
+
+	// Common error patterns and their friendly messages
+	errorMappings := []struct {
+		pattern string
+		message string
+	}{
+		{"version is required", "VALIDATION: Missing 'version' field"},
+		{"profile.model is required", "VALIDATION: Missing 'profile.model' field"},
+		{"at least one command", "VALIDATION: Document must contain at least one command"},
+		{"invalid paper_width", "VALIDATION: Invalid paper width (use 58 or 80)"},
+		{"invalid dpi", "VALIDATION: Invalid DPI value"},
+		{"invalid version format", "VALIDATION: Invalid version format (use X.Y pattern)"},
+		{"error conectando a impresora", "PRINTER: Cannot connect - check if printer is installed"},
+		{"nombre de impresora no especificado", "PRINTER: No printer name specified in profile.model"},
+		{"QR data cannot be empty", "QR:  Data cannot be empty"},
+		{"QR data too long", "QR: Data exceeds maximum length"},
+		{"barcode symbology is required", "BARCODE: Symbology type is required"},
+		{"barcode data is required", "BARCODE: Data is required"},
+		{"table overflow", "TABLE:  Columns exceed paper width"},
+		{"raw command cannot be empty", "RAW: Command hex cannot be empty"},
+		{"unsafe command blocked", "RAW:  Blocked by safe_mode - potentially dangerous command"},
+		{"failed to load image", "IMAGE: Invalid or corrupted base64 data"},
+		{"invalid QR correction level", "QR:  Invalid correction level (use L, M, Q, or H)"},
+		{"unknown command type", "COMMAND:  Unknown command type"},
+	}
+
+	// Check for matching patterns
+	for _, mapping := range errorMappings {
+		if strings.Contains(strings.ToLower(errStr), strings.ToLower(mapping.pattern)) {
+			return mapping.message
+		}
+	}
+
+	// Categorize by error source
+	if strings.Contains(errStr, "documento inválido") {
+		return fmt.Sprintf("VALIDATION: %s", extractInnerError(errStr))
+	}
+	if strings.Contains(errStr, "error parseando") {
+		return "JSON: Invalid document structure"
+	}
+	if strings.Contains(errStr, "error ejecutando") {
+		return fmt.Sprintf("EXECUTION: %s", extractInnerError(errStr))
+	}
+
+	// Fallback:  return cleaned error
+	return fmt.Sprintf("ERROR: %s", cleanErrorMessage(errStr))
+}
+
+// extractInnerError gets the innermost error message
+func extractInnerError(errStr string) string {
+	// Find the last colon-separated segment
+	parts := strings.Split(errStr, ": ")
+	if len(parts) > 0 {
+		return parts[len(parts)-1]
+	}
+	return errStr
+}
+
+// cleanErrorMessage removes verbose prefixes
+func cleanErrorMessage(errStr string) string {
+	// Remove common prefixes
+	prefixes := []string{
+		"error parseando documento:  ",
+		"documento inválido: ",
+		"error ejecutando documento: ",
+		"error creando servicio de impresión: ",
+	}
+	result := errStr
+	for _, prefix := range prefixes {
+		result = strings.TrimPrefix(result, prefix)
+	}
+	return result
 }
 
 // executePrint performs the actual printing using Poster library
@@ -162,7 +257,7 @@ func (w *Worker) executePrint(job *server.PrintJob) error {
 		return fmt.Errorf("nombre de impresora no especificado")
 	}
 
-	log.Printf("[i] Job %s -> Impresora: %s", job.ID, printerName)
+	log.Printf("[WORKER] 🖨️ Job %s -> Printer: %s", job.ID, printerName)
 
 	// 4. Create connection (open per job, close immediately after)
 	conn, err := connection.NewWindowsPrintConnector(printerName)
@@ -171,7 +266,7 @@ func (w *Worker) executePrint(job *server.PrintJob) error {
 	}
 	defer func() {
 		if err := conn.Close(); err != nil {
-			log.Printf("[!] Error cerrando conexión:  %v", err)
+			log.Printf("[WORKER] ⚠️ Error closing connection: %v", err)
 		}
 	}()
 
@@ -188,7 +283,7 @@ func (w *Worker) executePrint(job *server.PrintJob) error {
 	}
 	defer func() {
 		if err := printer.Close(); err != nil {
-			log.Printf("[! ] Error cerrando printer: %v", err)
+			log.Printf("[WORKER] ⚠️ Error closing printer: %v", err)
 		}
 	}()
 
@@ -276,11 +371,17 @@ func (w *Worker) Stats() Statistics {
 	defer w.mu.Unlock()
 
 	return Statistics{
-		IsRunning: w.isRunning,
+		IsRunning:     w.isRunning,
+		JobsProcessed: w.jobsProcessed,
+		JobsFailed:    w.jobsFailed,
+		LastJobTime:   w.lastJobTime,
 	}
 }
 
 // Statistics holds worker runtime statistics
 type Statistics struct {
-	IsRunning bool `json:"is_running"`
+	IsRunning     bool      `json:"is_running"`
+	JobsProcessed int64     `json:"jobs_processed"`
+	JobsFailed    int64     `json:"jobs_failed"`
+	LastJobTime   time.Time `json:"last_job_time,omitempty"`
 }

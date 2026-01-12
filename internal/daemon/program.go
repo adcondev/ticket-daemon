@@ -2,6 +2,7 @@ package daemon
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io/fs"
 	"log"
@@ -13,9 +14,8 @@ import (
 
 	"github.com/judwhite/go-svc"
 
-	"github.com/adcondev/ticket-daemon/internal/server"
-
 	"github.com/adcondev/ticket-daemon/internal/assets"
+	"github.com/adcondev/ticket-daemon/internal/server"
 	"github.com/adcondev/ticket-daemon/internal/worker"
 )
 
@@ -72,6 +72,7 @@ type Program struct {
 	httpServer  *http.Server
 	wsServer    *server.Server
 	printWorker *worker.Worker
+	startTime   time.Time
 }
 
 // Init initializes the service
@@ -83,10 +84,10 @@ func (p *Program) Init(env svc.Environment) error {
 	}
 
 	log.Println("╔════════════════════════════════════════════════════════════╗")
-	log.Println("║   TICKET DAEMON - Servicio de Impresión POS               ║")
+	log.Println("║   🎫 TICKET DAEMON - POS Print Service                     ║")
 	log.Println("╚════════════════════════════════════════════════════════════╝")
-	log.Printf("[i] Iniciando Servicio - Ambiente: %s", envConfig.Name)
-	log.Printf("[i] Build: %s %s", BuildDate, BuildTime)
+	log.Printf("[INIT] 🚀 Starting service - Environment: %s", envConfig.Name)
+	log.Printf("[INIT] 📅 Build: %s %s", BuildDate, BuildTime)
 
 	return nil
 }
@@ -94,6 +95,7 @@ func (p *Program) Init(env svc.Environment) error {
 // Start starts the service
 func (p *Program) Start() error {
 	p.quit = make(chan struct{})
+	p.startTime = time.Now()
 	envConfig := GetEnvConfig()
 
 	// Initialize WebSocket server
@@ -117,22 +119,57 @@ func (p *Program) Start() error {
 	// WebSocket endpoint
 	mux.HandleFunc("/ws", p.wsServer.HandleWebSocket)
 
-	// Health check endpoint
+	// Enhanced health check endpoint with more metrics
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		current, capacity := p.wsServer.QueueStatus()
 		workerStats := p.printWorker.Stats()
+		uptime := time.Since(p.startTime)
+
 		w.Header().Set("Content-Type", "application/json")
-		fmt.Fprintf(w, `{"status":"ok","queue": {"current":%d,"capacity":%d},"worker":{"running":%t},"build":{"env":"%s","date":"%s"}}`,
-			current, capacity, workerStats.IsRunning, BuildEnvironment, BuildDate)
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+
+		// Enhanced health response
+		response := fmt.Sprintf(`{
+  "status": "ok",
+  "queue": {
+    "current": %d,
+    "capacity": %d,
+    "utilization": %.1f
+  },
+  "worker": {
+    "running": %t,
+    "jobs_processed": %d,
+    "jobs_failed": %d
+  },
+  "build": {
+    "env": "%s",
+    "date": "%s",
+    "time": "%s"
+  },
+  "uptime_seconds": %d
+}`,
+			current,
+			capacity,
+			float64(current)/float64(capacity)*100,
+			workerStats.IsRunning,
+			workerStats.JobsProcessed,
+			workerStats.JobsFailed,
+			BuildEnvironment,
+			BuildDate,
+			BuildTime,
+			int(uptime.Seconds()),
+		)
+
+		fmt.Fprint(w, response)
 	})
 
 	// Serve embedded web files
 	webFS, err := fs.Sub(assets.WebFiles, "web")
 	if err != nil {
-		log.Printf("[! ] Error loading embedded web files: %v", err)
+		log.Printf("[INIT] ⚠️ Error loading embedded web files: %v", err)
 	} else {
 		mux.Handle("/", http.FileServer(http.FS(webFS)))
-		log.Println("[i] Serving embedded web client")
+		log.Println("[INIT] 🌐 Serving embedded web client")
 	}
 
 	p.httpServer = &http.Server{
@@ -147,13 +184,15 @@ func (p *Program) Start() error {
 	go func() {
 		defer p.wg.Done()
 
-		log.Printf("[i] Servidor TICKET DAEMON - Ambiente: %s", envConfig.Name)
-		log.Printf("[i] WebSocket: ws://%s/ws", envConfig.ListenAddr)
-		log.Printf("[i] Test client: http://%s", envConfig.ListenAddr)
-		log.Printf("[i] Health: http://%s/health", envConfig.ListenAddr)
+		log.Println("┌─────────────────────────────────────────────────────────────┐")
+		log.Printf("│ 🎫 TICKET DAEMON READY - Environment: %-22s│", envConfig.Name)
+		log.Printf("│ 🔌 WebSocket: ws://%s/ws%-25s│", envConfig.ListenAddr, "")
+		log.Printf("│ 🌐 Dashboard: http://%s%-27s│", envConfig.ListenAddr, "")
+		log.Printf("│ 💚 Health:     http://%s/health%-20s│", envConfig.ListenAddr, "")
+		log.Println("└─────────────────────────────────────────────────────────────┘")
 
-		if err := p.httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Printf("[X] Error al iniciar servidor HTTP: %v", err)
+		if err := p.httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Printf("[HTTP] ❌ Error starting HTTP server: %v", err)
 		}
 	}()
 
@@ -162,7 +201,7 @@ func (p *Program) Start() error {
 
 // Stop stops the service gracefully
 func (p *Program) Stop() error {
-	log.Println("[.] Servicio deteniéndose...")
+	log.Println("[STOP] 🛑 Service shutting down...")
 
 	if p.printWorker != nil {
 		p.printWorker.Stop()
@@ -173,7 +212,7 @@ func (p *Program) Stop() error {
 
 	if p.httpServer != nil {
 		if err := p.httpServer.Shutdown(ctx); err != nil {
-			log.Printf("[! ] Error durante shutdown HTTP: %v", err)
+			log.Printf("[STOP] ⚠️ HTTP shutdown error: %v", err)
 		}
 	}
 
@@ -184,7 +223,8 @@ func (p *Program) Stop() error {
 	close(p.quit)
 	p.wg.Wait()
 
-	log.Println("[OK] Servicio detenido correctamente")
+	uptime := time.Since(p.startTime)
+	log.Printf("[STOP] ✅ Service stopped (uptime: %v)", uptime.Round(time.Second))
 	return nil
 }
 
@@ -200,6 +240,6 @@ func initLogging(envConfig EnvironmentConfig) error {
 		return err
 	}
 
-	log.Printf("[i] Logs en: %s", logPath)
+	log.Printf("[INIT] 📁 Log file: %s", logPath)
 	return nil
 }

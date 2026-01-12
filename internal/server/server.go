@@ -41,6 +41,7 @@ type Response struct {
 	Status   string `json:"status,omitempty"`
 	Mensaje  string `json:"mensaje,omitempty"`
 	Position int    `json:"position,omitempty"`
+	Capacity int    `json:"capacity,omitempty"`
 }
 
 // Server manages WebSocket connections and job queue
@@ -83,21 +84,21 @@ func (s *Server) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 		OriginPatterns:     []string{"*"},
 	})
 	if err != nil {
-		log.Printf("[X] Error al aceptar cliente: %v", err)
+		log.Printf("[WS] ❌ Error accepting client: %v", err)
 		return
 	}
 
 	// Register client
 	s.clients.Add(conn)
 	clientCount := s.clients.Count()
-	log.Printf("[+] Cliente conectado (total: %d)", clientCount)
+	log.Printf("[WS] ➕ Client connected (total: %d) from %s", clientCount, r.RemoteAddr)
 
 	// Send welcome message
 	ctx := r.Context()
 	welcome := Response{
 		Tipo:    "info",
 		Status:  "connected",
-		Mensaje: "Conectado al servidor de impresión de tickets",
+		Mensaje: "Connected to Ticket Daemon print server",
 	}
 	_ = wsjson.Write(ctx, conn, welcome)
 
@@ -106,8 +107,8 @@ func (s *Server) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 
 	// Cleanup on disconnect
 	s.clients.Remove(conn)
-	conn.Close(websocket.StatusNormalClosure, "desconectado")
-	log.Printf("[-] Cliente desconectado (restantes: %d)", s.clients.Count())
+	conn.Close(websocket.StatusNormalClosure, "disconnected")
+	log.Printf("[WS] ➖ Client disconnected (remaining: %d)", s.clients.Count())
 }
 
 // handleMessages processes incoming messages from a client
@@ -127,7 +128,7 @@ func (s *Server) handleMessages(ctx context.Context, conn *websocket.Conn) {
 				ctx.Err() != nil {
 				return
 			}
-			log.Printf("[!] Error leyendo mensaje: %v", err)
+			log.Printf("[WS] ⚠️ Error reading message: %v", err)
 			return
 		}
 
@@ -145,7 +146,8 @@ func (s *Server) routeMessage(ctx context.Context, conn *websocket.Conn, msg *Me
 	case "ping":
 		s.handlePing(ctx, conn, msg)
 	default:
-		s.sendError(ctx, conn, msg.ID, "Tipo de mensaje desconocido:  "+msg.Tipo)
+		log.Printf("[WS] ⚠️ Unknown message type: %s", msg.Tipo)
+		s.sendError(ctx, conn, msg.ID, "Unknown message type: "+msg.Tipo)
 	}
 }
 
@@ -159,7 +161,8 @@ func (s *Server) handleTicket(ctx context.Context, conn *websocket.Conn, msg *Me
 
 	// Validate document exists
 	if len(msg.Datos) == 0 {
-		s.sendError(ctx, conn, jobID, "Campo 'datos' requerido para tipo 'ticket'")
+		log.Printf("[QUEUE] ❌ Job %s rejected: missing 'datos' field", jobID)
+		s.sendError(ctx, conn, jobID, "Field 'datos' is required for type 'ticket'")
 		return
 	}
 
@@ -175,31 +178,35 @@ func (s *Server) handleTicket(ctx context.Context, conn *websocket.Conn, msg *Me
 	select {
 	case s.jobQueue <- job:
 		current, capacity := s.QueueStatus()
-		log.Printf("[>] Job encolado:  %s (cola: %d/%d)", jobID, current, capacity)
+		log.Printf("[QUEUE] 📥 Job queued: %s (queue: %d/%d)", jobID, current, capacity)
 
 		response := Response{
 			Tipo:     "ack",
 			ID:       jobID,
 			Status:   "queued",
 			Position: current,
-			Mensaje:  "Trabajo en cola",
+			Capacity: capacity,
+			Mensaje:  "Job queued for printing",
 		}
 		_ = wsjson.Write(ctx, conn, response)
 
 	default:
 		// Queue full
-		log.Printf("[!] Cola llena, rechazando job: %s", jobID)
-		s.sendError(ctx, conn, jobID, "Cola llena, reintente en unos segundos")
+		current, capacity := s.QueueStatus()
+		log.Printf("[QUEUE] 🚫 Queue full, rejecting job: %s (%d/%d)", jobID, current, capacity)
+		s.sendError(ctx, conn, jobID, "Queue full, please retry in a few seconds")
 	}
 }
 
 // handleStatus sends queue status
 func (s *Server) handleStatus(ctx context.Context, conn *websocket.Conn) {
 	current, capacity := s.QueueStatus()
+
 	response := Response{
 		Tipo:     "status",
 		Status:   "ok",
 		Position: current,
+		Capacity: capacity,
 		Mensaje:  formatStatus(current, capacity),
 	}
 	_ = wsjson.Write(ctx, conn, response)
@@ -243,15 +250,18 @@ func (s *Server) Shutdown() {
 	s.shutdownOnce.Do(func() {
 		close(s.shutdownChan)
 
+		clientCount := s.clients.Count()
+		log.Printf("[WS] 🛑 Shutting down, disconnecting %d clients", clientCount)
+
 		// Notify all clients
 		s.clients.ForEach(func(conn *websocket.Conn) {
-			conn.Close(websocket.StatusGoingAway, "Servidor apagándose")
+			conn.Close(websocket.StatusGoingAway, "Server shutting down")
 		})
 	})
 }
 
 func formatStatus(current, capacity int) string {
-	return "Cola: " + itoa(current) + "/" + itoa(capacity)
+	return "Queue: " + itoa(current) + "/" + itoa(capacity)
 }
 
 func itoa(i int) string {

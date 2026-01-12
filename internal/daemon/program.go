@@ -1,9 +1,9 @@
-// Package daemon contiene la lógica del servicio de Windows.
 package daemon
 
 import (
 	"context"
 	"fmt"
+	"io/fs"
 	"log"
 	"net/http"
 	"os"
@@ -14,6 +14,8 @@ import (
 	"github.com/judwhite/go-svc"
 
 	"github.com/adcondev/ticket-daemon/internal/server"
+
+	"github.com/adcondev/ticket-daemon/internal/assets"
 	"github.com/adcondev/ticket-daemon/internal/worker"
 )
 
@@ -44,14 +46,14 @@ var envConfigs = map[string]EnvironmentConfig{
 		ServiceName:    serviceName,
 		ListenAddr:     "0.0.0.0:8766",
 		Verbose:        false,
-		DefaultPrinter: "", // Must be specified in document
+		DefaultPrinter: "",
 	},
 	"test": {
 		Name:           "TEST/DEV",
 		ServiceName:    serviceNameTest,
 		ListenAddr:     "localhost:8766",
 		Verbose:        true,
-		DefaultPrinter: "80mm EC-PM-80250", // Default for testing
+		DefaultPrinter: "80mm EC-PM-80250",
 	},
 }
 
@@ -72,11 +74,10 @@ type Program struct {
 	printWorker *worker.Worker
 }
 
-// Init initializes the service (logging, directories, etc.)
+// Init initializes the service
 func (p *Program) Init(env svc.Environment) error {
 	envConfig := GetEnvConfig()
 
-	// Initialize logging
 	if err := initLogging(envConfig); err != nil {
 		return fmt.Errorf("failed to initialize logging: %w", err)
 	}
@@ -108,8 +109,6 @@ func (p *Program) Start() error {
 			DefaultPrinter: envConfig.DefaultPrinter,
 		},
 	)
-
-	// Start worker
 	p.printWorker.Start()
 
 	// Create HTTP server
@@ -123,12 +122,18 @@ func (p *Program) Start() error {
 		current, capacity := p.wsServer.QueueStatus()
 		workerStats := p.printWorker.Stats()
 		w.Header().Set("Content-Type", "application/json")
-		fmt.Fprintf(w, `{"status":"ok","queue": {"current":%d,"capacity":%d},"worker":{"running":%t}}`,
-			current, capacity, workerStats.IsRunning)
+		fmt.Fprintf(w, `{"status":"ok","queue": {"current":%d,"capacity":%d},"worker":{"running":%t},"build":{"env":"%s","date":"%s"}}`,
+			current, capacity, workerStats.IsRunning, BuildEnvironment, BuildDate)
 	})
 
-	// Static files for test client
-	mux.Handle("/", http.FileServer(http.Dir("web")))
+	// Serve embedded web files
+	webFS, err := fs.Sub(assets.WebFiles, "web")
+	if err != nil {
+		log.Printf("[! ] Error loading embedded web files: %v", err)
+	} else {
+		mux.Handle("/", http.FileServer(http.FS(webFS)))
+		log.Println("[i] Serving embedded web client")
+	}
 
 	p.httpServer = &http.Server{
 		Addr:         envConfig.ListenAddr,
@@ -143,10 +148,9 @@ func (p *Program) Start() error {
 		defer p.wg.Done()
 
 		log.Printf("[i] Servidor TICKET DAEMON - Ambiente: %s", envConfig.Name)
-		log.Printf("[i] Build: %s %s", BuildDate, BuildTime)
-		log.Printf("[i] WebSocket activo en ws://%s/ws", envConfig.ListenAddr)
-		log.Printf("[i] Health check en http://%s/health", envConfig.ListenAddr)
-		log.Printf("[i] Impresora por defecto: %s", defaultOrNone(envConfig.DefaultPrinter))
+		log.Printf("[i] WebSocket: ws://%s/ws", envConfig.ListenAddr)
+		log.Printf("[i] Test client: http://%s", envConfig.ListenAddr)
+		log.Printf("[i] Health: http://%s/health", envConfig.ListenAddr)
 
 		if err := p.httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Printf("[X] Error al iniciar servidor HTTP: %v", err)
@@ -160,22 +164,19 @@ func (p *Program) Start() error {
 func (p *Program) Stop() error {
 	log.Println("[.] Servicio deteniéndose...")
 
-	// Stop worker first (drain queue or timeout)
 	if p.printWorker != nil {
 		p.printWorker.Stop()
 	}
 
-	// Graceful shutdown with timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	if p.httpServer != nil {
 		if err := p.httpServer.Shutdown(ctx); err != nil {
-			log.Printf("[!] Error durante shutdown HTTP: %v", err)
+			log.Printf("[! ] Error durante shutdown HTTP: %v", err)
 		}
 	}
 
-	// Close WebSocket server (notifies clients)
 	if p.wsServer != nil {
 		p.wsServer.Shutdown()
 	}
@@ -187,31 +188,18 @@ func (p *Program) Stop() error {
 	return nil
 }
 
-// initLogging sets up file logging with rotation
 func initLogging(envConfig EnvironmentConfig) error {
-	// Configure log file path
 	logDir := filepath.Join(os.Getenv("PROGRAMDATA"), envConfig.ServiceName)
 	logPath := filepath.Join(logDir, envConfig.ServiceName+".log")
 
-	// Create directory if not exists
 	if err := os.MkdirAll(logDir, 0755); err != nil {
 		return err
 	}
 
-	// Initialize logger
 	if err := InitLogger(logPath, envConfig.Verbose); err != nil {
 		return err
 	}
 
 	log.Printf("[i] Logs en: %s", logPath)
-	log.Printf("[i] Verbose: %v", envConfig.Verbose)
-
 	return nil
-}
-
-func defaultOrNone(s string) string {
-	if s == "" {
-		return "(ninguna - debe especificarse en documento)"
-	}
-	return s
 }

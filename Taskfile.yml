@@ -2,30 +2,53 @@ version: '3'
 
 vars:
   SERVICE_NAME: TicketServicio
-  SERVICE_NAME_TEST: TicketServicioTest
-  BINARY_NAME: TicketServicio.exe
+  SERVICE_TEST: TicketServicioTest
+  BINARY: TicketServicio.exe
   BUILD_DIR: ./bin
-  MODULE_PATH: github.com/adcondev/ticket-daemon/internal/daemon
+  MODULE: github.com/adcondev/ticket-daemon/internal/daemon
 
+# Default task - show help
 tasks:
   default:
-    desc: Build and run in test mode
-    cmds:
-      - task: run
-
-  # ============================================================================
-  # BUILD TASKS
-  # ============================================================================
-
-  build-test:
-    desc: Build for test/development environment (verbose, localhost only)
+    desc: "Show available commands"
+    silent: true
     cmds:
       - |
-        go build -ldflags "-s -w \
-          -X {{.MODULE_PATH}}.BuildEnvironment=test \
-          -X {{.MODULE_PATH}}.BuildDate={{.DATE}} \
-          -X {{.MODULE_PATH}}.BuildTime={{.TIME}}" \
-          -o {{.BUILD_DIR}}/{{.BINARY_NAME}} ./cmd/TicketServicio
+        echo  
+        echo ══════════════════════════════════════════════════════════
+        echo   TICKET DAEMON - Service Manager
+        echo ══════════════════════════════════════════════════════════
+        echo  
+        echo   QUICK START:
+        echo     task build        Build the service (test mode)
+        echo     task run          Build and run locally
+        echo  
+        echo   SERVICE MANAGEMENT (Run as Administrator):
+        echo     task install      Install as Windows Service
+        echo     task uninstall    Remove Windows Service
+        echo     task start        Start the service
+        echo     task stop         Stop the service
+        echo     task restart      Restart the service
+        echo     task status       Check service status
+        echo  
+        echo   DEBUGGING:
+        echo     task logs         View logs in real-time
+        echo     task health       Check health endpoint
+        echo     task open         Open test client in browser
+        echo  
+        echo   CLEANUP:
+        echo     task clean        Remove build artifacts
+        echo  
+
+  # ══════════════════════════════════════════════════════════════════
+  # BUILD
+  # ══════════════════════════════════════════════════════════════════
+  build:
+    desc: "Build service for testing (localhost: 8766)"
+    cmds:
+      - powershell -Command "if (!(Test-Path '{{.BUILD_DIR}}')) { New-Item -ItemType Directory -Path '{{.BUILD_DIR}}' -Force | Out-Null }"
+      - go build -ldflags "-s -w -H=windowsgui -X {{.MODULE}}.BuildEnvironment=test -X {{.MODULE}}.BuildDate={{.DATE}} -X {{.MODULE}}.BuildTime={{.TIME}}" -o {{.BUILD_DIR}}/{{.BINARY}} ./cmd/TicketServicio
+      - powershell -Command "Write-Host '✅ Built {{.BUILD_DIR}}/{{.BINARY}}'"
     vars:
       DATE:
         sh: powershell -Command "Get-Date -Format 'yyyy-MM-dd'"
@@ -33,200 +56,107 @@ tasks:
         sh: powershell -Command "Get-Date -Format 'HH:mm:ss'"
 
   build-prod:
-    desc: Build for production environment (quiet, all interfaces)
+    desc: "Build service for production (0.0.0.0:8766)"
     cmds:
-      - |
-        go build -ldflags "-s -w \
-          -X {{.MODULE_PATH}}.BuildEnvironment=prod \
-          -X {{.MODULE_PATH}}.BuildDate={{.DATE}} \
-          -X {{.MODULE_PATH}}.BuildTime={{.TIME}}" \
-          -o {{.BUILD_DIR}}/{{.BINARY_NAME}} ./cmd/TicketServicio
+      - powershell -Command "if (!(Test-Path '{{.BUILD_DIR}}')) { New-Item -ItemType Directory -Path '{{.BUILD_DIR}}' -Force | Out-Null }"
+      - go build -ldflags "-s -w -X {{.MODULE}}.BuildEnvironment=prod -X {{.MODULE}}.BuildDate={{.DATE}} -X {{.MODULE}}.BuildTime={{.TIME}}" -o {{.BUILD_DIR}}/{{.BINARY}} ./cmd/TicketServicio
+      - powershell -Command "Write-Host '✅ Built {{.BUILD_DIR}}/{{.BINARY}} (PRODUCTION)'"
     vars:
       DATE:
         sh: powershell -Command "Get-Date -Format 'yyyy-MM-dd'"
       TIME:
         sh: powershell -Command "Get-Date -Format 'HH:mm:ss'"
 
-  # ============================================================================
-  # RUN TASKS
-  # ============================================================================
-
   run:
-    desc: Build (test) and run locally in console mode
-    deps: [ build-test ]
+    desc: "Build and run locally (console mode)"
+    deps: [ build ]
     cmds:
-      - '{{.BUILD_DIR}}/{{.BINARY_NAME}}'
+      - echo 🚀 Starting Ticket Daemon...
+      - echo    WebSocket:ws://localhost:8766/ws
+      - echo    Test client:http://localhost:8766
+      - echo    Press Ctrl+C to stop
+      - echo
+      - '{{.BUILD_DIR}}/{{.BINARY}}'
 
-  run-prod:
-    desc: Build (prod) and run locally in console mode
-    deps: [ build-prod ]
+  # ══════════════════════════════════════════════════════════════════
+  # SERVICE MANAGEMENT (Requires Administrator)
+  # ══════════════════════════════════════════════════════════════════
+  install:
+    desc: "Install as Windows Service (requires Admin)"
+    deps: [ build ]
     cmds:
-      - '{{.BUILD_DIR}}/{{.BINARY_NAME}}'
-
-  # ============================================================================
-  # SERVICE INSTALLATION (Run as Administrator)
-  # ============================================================================
-
-  install-test:
-    desc: Install as Windows Service (TEST - requires Administrator)
-    deps: [ build-test ]
-    cmds:
-      - cmd: sc stop {{.SERVICE_NAME_TEST}}
+      - cmd: sc stop {{.SERVICE_TEST}} 2>nul
         ignore_error: true
-      - cmd: sc delete {{.SERVICE_NAME_TEST}}
+      - cmd: sc delete {{.SERVICE_TEST}} 2>nul
         ignore_error: true
-      - sc create {{.SERVICE_NAME_TEST}} binPath= "{{.ABS_PATH}}\{{.BUILD_DIR}}\{{.BINARY_NAME}}" start= auto DisplayName= "Ticket Daemon (Test)"
-      - sc description {{.SERVICE_NAME_TEST}} "Servicio de impresión de tickets POS via WebSocket (Ambiente de Pruebas)"
-      - sc start {{.SERVICE_NAME_TEST}}
-      - echo "✅ Servicio {{.SERVICE_NAME_TEST}} instalado e iniciado"
+      - sc create {{.SERVICE_TEST}} binPath= "{{.ABS_PATH}}\{{.BUILD_DIR}}\{{.BINARY}}" start= auto DisplayName= "Ticket Daemon (Test)"
+      - sc description {{.SERVICE_TEST}} "Servicio de impresion de tickets POS via WebSocket"
+      - sc start {{.SERVICE_TEST}}
+      - echo
+      - echo ✅ Service installed and started!
+      - echo Test client:http://localhost:8766
     vars:
       ABS_PATH:
         sh: powershell -Command "(Get-Location).Path"
 
-  install-prod:
-    desc: Install as Windows Service (PRODUCTION - requires Administrator)
-    deps: [ build-prod ]
+  uninstall:
+    desc: "Remove Windows Service (requires Admin)"
     cmds:
-      - cmd: sc stop {{.SERVICE_NAME}}
+      - cmd: sc stop {{.SERVICE_TEST}} 2>nul
         ignore_error: true
-      - cmd: sc delete {{.SERVICE_NAME}}
-        ignore_error: true
-      - sc create {{.SERVICE_NAME}} binPath= "{{.ABS_PATH}}\{{.BUILD_DIR}}\{{.BINARY_NAME}}" start= auto DisplayName= "Ticket Daemon"
-      - sc description {{.SERVICE_NAME}} "Servicio de impresión de tickets POS via WebSocket"
-      - sc start {{.SERVICE_NAME}}
-      - echo "✅ Servicio {{.SERVICE_NAME}} instalado e iniciado"
-    vars:
-      ABS_PATH:
-        sh: powershell -Command "(Get-Location).Path"
-
-  uninstall-test:
-    desc: Uninstall TEST Windows Service (requires Administrator)
-    cmds:
-      - cmd: sc stop {{.SERVICE_NAME_TEST}}
-        ignore_error: true
-      - sc delete {{.SERVICE_NAME_TEST}}
-      - echo "✅ Servicio {{.SERVICE_NAME_TEST}} eliminado"
-
-  uninstall-prod:
-    desc: Uninstall PRODUCTION Windows Service (requires Administrator)
-    cmds:
-      - cmd: sc stop {{.SERVICE_NAME}}
-        ignore_error: true
-      - sc delete {{.SERVICE_NAME}}
-      - echo "✅ Servicio {{.SERVICE_NAME}} eliminado"
-
-  # ============================================================================
-  # SERVICE CONTROL
-  # ============================================================================
+      - sc delete {{.SERVICE_TEST}}
+      - echo ✅ Service removed
 
   start:
-    desc: Start the test service
+    desc: "Start the service"
     cmds:
-      - sc start {{.SERVICE_NAME_TEST}}
+      - sc start {{.SERVICE_TEST}}
+      - echo ✅ Service started
 
   stop:
-    desc: Stop the test service
+    desc: "Stop the service"
     cmds:
-      - sc stop {{.SERVICE_NAME_TEST}}
+      - sc stop {{.SERVICE_TEST}}
+      - echo ✅ Service stopped
 
   restart:
-    desc: Restart the test service
+    desc: "Restart the service"
     cmds:
-      - sc stop {{.SERVICE_NAME_TEST}}
-      - timeout /t 2 /nobreak > nul
-      - sc start {{.SERVICE_NAME_TEST}}
+      - cmd: sc stop {{.SERVICE_TEST}} 2>nul
+        ignore_error: true
+      - powershell -Command "Start-Sleep -Seconds 2"
+      - sc start {{.SERVICE_TEST}}
+      - echo ✅ Service restarted
 
   status:
-    desc: Check service status
+    desc: "Check service status"
     cmds:
-      - sc query {{.SERVICE_NAME_TEST}}
+      - sc query {{.SERVICE_TEST}}
 
-  # ============================================================================
-  # LOGS & DEBUGGING
-  # ============================================================================
-
+  # ══════════════════════════════════════════════════════════════════
+  # DEBUGGING
+  # ══════════════════════════════════════════════════════════════════
   logs:
-    desc: Tail the test service log file
+    desc: "View last 100 log lines"
     cmds:
-      - powershell -Command "Get-Content '$env:PROGRAMDATA\{{.SERVICE_NAME_TEST}}\{{.SERVICE_NAME_TEST}}.log' -Tail 50 -Wait"
-
-  logs-prod:
-    desc: Tail the production service log file
-    cmds:
-      - powershell -Command "Get-Content '$env:PROGRAMDATA\{{.SERVICE_NAME}}\{{.SERVICE_NAME}}.log' -Tail 50 -Wait"
-
-  logs-clear:
-    desc: Clear the test service log file
-    cmds:
-      - powershell -Command "if (Test-Path '$env:PROGRAMDATA\{{.SERVICE_NAME_TEST}}\{{.SERVICE_NAME_TEST}}.log') { Clear-Content '$env:PROGRAMDATA\{{.SERVICE_NAME_TEST}}\{{.SERVICE_NAME_TEST}}.log' }"
-      - echo "✅ Logs limpiados"
+      - powershell -Command "Get-Content 'C:\ProgramData\{{.SERVICE_TEST}}\{{.SERVICE_TEST}}.log' -Tail 100"
 
   health:
-    desc: Check service health endpoint
+    desc: "Check health endpoint"
     cmds:
       - powershell -Command "(Invoke-WebRequest -Uri 'http://localhost:8766/health' -UseBasicParsing).Content"
 
-  # ============================================================================
-  # DEVELOPMENT
-  # ============================================================================
+  open:
+    desc: "Open test client in browser"
+    cmds:
+      - start http://localhost:8766
 
+  # ══════════════════════════════════════════════════════════════════
+  # CLEANUP
+  # ══════════════════════════════════════════════════════════════════
   clean:
-    desc: Clean build artifacts
+    desc: "Remove build artifacts"
     cmds:
-      - cmd: rmdir /s /q {{.BUILD_DIR}}
-        ignore_error: true
-      - echo "✅ Build artifacts eliminados"
-
-  lint:
-    desc: Run linter
-    cmds:
-      - golangci-lint run ./...
-
-  test:
-    desc: Run tests
-    cmds:
-      - go test -v ./...
-
-  fmt:
-    desc: Format code
-    cmds:
-      - go fmt ./...
-
-  tidy:
-    desc: Tidy go modules
-    cmds:
-      - go mod tidy
-
-  # ============================================================================
-  # QUICK REFERENCE
-  # ============================================================================
-
-  help:
-    desc: Show quick reference
-    silent: true
-    cmds:
-      - cmd: |
-          echo  
-          echo ========================================
-          echo   TICKET DAEMON - Quick Reference
-          echo ========================================
-          echo  
-          echo   Development: 
-          echo     task run          - Build and run locally - test mode
-          echo     task build-test   - Build test binary
-          echo     task build-prod   - Build production binary
-          echo  
-          echo   Service Run as Admin:
-          echo     task install-test   - Install test service
-          echo     task install-prod   - Install prod service
-          echo     task uninstall-test - Remove test service
-          echo     task start/stop     - Control test service
-          echo  
-          echo   Debugging:
-          echo     task logs         - Tail log file
-          echo     task health       - Check health endpoint
-          echo     task status       - Check service status
-          echo  
-          echo   Test Client:
-          echo     http://localhost:8766
-          echo
+      - cmd: if exist {{.BUILD_DIR}} rmdir /s /q {{.BUILD_DIR}}
+        platforms: [ windows ]
+      - echo ✅ Cleaned

@@ -1,438 +1,1715 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ticket Daemon - Test Client</title>
-    <style>
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🎫 Ticket Daemon | Centro de Control</title>
+  <style>
+    /* ============================================================
+       VARIABLES RAÍZ
+       ============================================================ */
+    :root {
+      --bg-dark: #0a0e17;
+      --bg-panel: #12181f;
+      --bg-card: #1a222d;
+      --bg-input: #232d3b;
+      --bg-hover: #2a3647;
+      --border: #2d3a4d;
+      --border-light: #3d4f66;
+      --text-main: #e8edf5;
+      --text-muted: #7a8599;
+      --text-dim: #4a5568;
 
-        body {
-            font-family: 'Segoe UI', system-ui, sans-serif;
-            background: #1a1a2e;
-            color: #eee;
-            padding: 20px;
-            min-height: 100vh;
-        }
+      /* Colores de Estado Vibrantes */
+      --c-success: #10b981;
+      --c-success-bg: rgba(16, 185, 129, 0.15);
+      --c-error: #ef4444;
+      --c-error-bg: rgba(239, 68, 68, 0.15);
+      --c-warning: #f59e0b;
+      --c-warning-bg: rgba(245, 158, 11, 0.15);
+      --c-info: #3b82f6;
+      --c-info-bg: rgba(59, 130, 246, 0.15);
+      --c-sent: #a855f7;
+      --c-sent-bg: rgba(168, 85, 247, 0.15);
+      --c-accent: #06b6d4;
+      --c-accent-bg: rgba(6, 182, 212, 0.1);
 
-        .container {
-            max-width: 900px;
-            margin: 0 auto;
-        }
+      /* Degradados */
+      --gradient-header: linear-gradient(135deg, #1a222d 0%, #0f1419 100%);
+      --gradient-success: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      --gradient-error: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+      --gradient-info: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+      --gradient-accent: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%);
+    }
 
-        h1 {
-            color: #00d4ff;
-            margin-bottom: 20px;
-        }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
 
-        .status-bar {
-            display: flex;
-            gap: 20px;
-            background: #16213e;
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-        }
+    body {
+      font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: var(--bg-dark);
+      color: var(--text-main);
+      display: grid;
+      grid-template-rows: 56px 1fr;
+      height: 100vh;
+      overflow: hidden;
+      line-height: 1.5;
+    }
 
-        .status-item {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
+    /* Barra de desplazamiento personalizada */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
 
-        .status-dot {
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-            background: #ff4444;
-        }
+    ::-webkit-scrollbar-track {
+      background: var(--bg-dark);
+      border-radius: 3px;
+    }
 
-        .status-dot.connected {
-            background: #44ff44;
-        }
+    ::-webkit-scrollbar-thumb {
+      background: var(--border-light);
+      border-radius: 3px;
+    }
 
-        .panel {
-            background: #16213e;
-            border-radius: 8px;
-            padding: 20px;
-            margin-bottom: 20px;
-        }
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--text-muted);
+    }
 
-        .panel h2 {
-            color: #00d4ff;
-            margin-bottom: 15px;
-            font-size: 1.2rem;
-        }
+    /* ============================================================
+       ENCABEZADO (HEADER)
+       ============================================================ */
+    header {
+      background: var(--gradient-header);
+      border-bottom: 1px solid var(--border);
+      padding: 0 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+    }
 
-        textarea {
-            width: 100%;
-            height: 200px;
-            background: #0f0f23;
-            border: 1px solid #333;
-            color: #fff;
-            font-family: 'Consolas', monospace;
-            padding: 10px;
-            border-radius: 4px;
-            resize: vertical;
-        }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
 
-        button {
-            background: #00d4ff;
-            color: #000;
-            border: none;
-            padding: 12px 24px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-weight: bold;
-            margin-right: 10px;
-            margin-top: 10px;
-        }
+    .brand-icon {
+      width: 36px;
+      height: 36px;
+      background: var(--gradient-accent);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.2rem;
+      box-shadow: 0 4px 12px rgba(6, 182, 212, 0.3);
+    }
 
-        button:hover {
-            background: #00a0cc;
-        }
+    .brand-text {
+      font-weight: 700;
+      font-size: 1.1rem;
+      letter-spacing: -0.5px;
+    }
 
-        button:disabled {
-            background: #666;
-            cursor: not-allowed;
-        }
+    .brand-text span {
+      color: var(--c-accent);
+    }
 
-        button.secondary {
-            background: #444;
-            color: #fff;
-        }
+    .header-center {
+      display: flex;
+      align-items: center;
+      gap: 24px;
+    }
 
-        button.secondary:hover {
-            background: #555;
-        }
+    .header-stat {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 14px;
+      background: var(--bg-card);
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      font-size: 0.8rem;
+    }
 
-        .log {
-            background: #0f0f23;
-            border: 1px solid #333;
-            border-radius: 4px;
-            padding: 15px;
-            height: 300px;
-            overflow-y: auto;
-            font-family: 'Consolas', monospace;
-            font-size: 13px;
-        }
+    .header-stat-label {
+      color: var(--text-muted);
+    }
 
-        .log-entry {
-            margin-bottom: 5px;
-            border-bottom: 1px solid #222;
-            padding-bottom: 5px;
-        }
+    .header-stat-value {
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+    }
 
-        .log-time {
-            color: #666;
-        }
+    .header-stat-value.success {
+      color: var(--c-success);
+    }
 
-        .log-type {
-            font-weight: bold;
-        }
+    .header-stat-value.error {
+      color: var(--c-error);
+    }
 
-        .log-type.info {
-            color: #00d4ff;
-        }
+    .conn-badge {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      transition: all 0.3s ease;
+    }
 
-        .log-type.ack {
-            color: #44ff44;
-        }
+    .conn-badge.online {
+      background: var(--c-success-bg);
+      color: var(--c-success);
+      border: 1px solid var(--c-success);
+      box-shadow: 0 0 20px rgba(16, 185, 129, 0.2);
+    }
 
-        .log-type.result {
-            color: #ffff44;
-        }
+    .conn-badge.offline {
+      background: var(--c-error-bg);
+      color: var(--c-error);
+      border: 1px solid var(--c-error);
+      box-shadow: 0 0 20px rgba(239, 68, 68, 0.2);
+    }
 
-        .log-type.error {
-            color: #ff4444;
-        }
+    .conn-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: currentColor;
+      animation: pulse 2s infinite;
+    }
 
-        .log-type.sent {
-            color: #ff44ff;
-        }
-    </style>
+    @keyframes pulse {
+      0%, 100% {
+        opacity: 1;
+        transform: scale(1);
+      }
+      50% {
+        opacity: 0.5;
+        transform: scale(0.9);
+      }
+    }
+
+    /* ============================================================
+       DASHBOARD PRINCIPAL - Diseño de 3 Columnas
+       ============================================================ */
+    .dashboard {
+      display: grid;
+      grid-template-columns: 320px 1fr 400px;
+      gap: 1px;
+      background: var(--border);
+      overflow: hidden;
+    }
+
+    .panel {
+      background: var(--bg-panel);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .panel-header {
+      padding: 16px 20px;
+      background: var(--bg-card);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-shrink: 0;
+    }
+
+    .panel-title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 600;
+      font-size: 0.9rem;
+      color: var(--text-main);
+    }
+
+    .panel-title-icon {
+      font-size: 1.1rem;
+    }
+
+    .panel-content {
+      padding: 20px;
+      overflow-y: auto;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+
+    /* ============================================================
+       PANEL IZQUIERDO - Estado del Sistema
+       ============================================================ */
+    .metrics-grid {
+      display: grid;
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+
+    .metric-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+      transition: all 0.2s ease;
+    }
+
+    .metric-card:hover {
+      border-color: var(--border-light);
+      transform: translateY(-1px);
+    }
+
+    .metric-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    .metric-label {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      font-weight: 600;
+    }
+
+    .metric-icon {
+      font-size: 1rem;
+      opacity: 0.7;
+    }
+
+    .metric-value {
+      font-size: 1.5rem;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .metric-value.success {
+      color: var(--c-success);
+    }
+
+    .metric-value.error {
+      color: var(--c-error);
+    }
+
+    .metric-value.warning {
+      color: var(--c-warning);
+    }
+
+    .metric-value.info {
+      color: var(--c-info);
+    }
+
+    .metric-value.muted {
+      color: var(--text-muted);
+    }
+
+    .metric-sub {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    /* Progreso de la Cola */
+    .queue-bar-container {
+      margin-top: 12px;
+    }
+
+    .queue-bar-labels {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+
+    .queue-bar-track {
+      height: 8px;
+      background: var(--bg-dark);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    .queue-bar-fill {
+      height: 100%;
+      background: var(--gradient-info);
+      border-radius: 4px;
+      transition: width 0.4s ease, background 0.3s ease;
+    }
+
+    .queue-bar-fill.warning {
+      background: var(--gradient-error);
+    }
+
+    /* Divisores de Sección */
+    .section-label {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      font-weight: 600;
+      margin: 24px 0 12px;
+    }
+
+    .section-label::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    /* Botones */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 12px 16px;
+      background: var(--bg-input);
+      color: var(--text-main);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      width: 100%;
+      margin-bottom: 8px;
+    }
+
+    .btn:hover:not(:disabled) {
+      background: var(--bg-hover);
+      border-color: var(--border-light);
+      transform: translateY(-1px);
+    }
+
+    .btn:active:not(:disabled) {
+      transform: translateY(0);
+    }
+
+    .btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    .btn-primary {
+      background: var(--gradient-accent);
+      border-color: var(--c-accent);
+      color: #fff;
+      box-shadow: 0 4px 12px rgba(6, 182, 212, 0.25);
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      box-shadow: 0 6px 20px rgba(6, 182, 212, 0.35);
+    }
+
+    .btn-danger {
+      background: var(--c-error-bg);
+      border-color: var(--c-error);
+      color: var(--c-error);
+    }
+
+    .btn-danger:hover:not(:disabled) {
+      background: var(--c-error);
+      color: #fff;
+    }
+
+    .btn-sm {
+      padding: 8px 12px;
+      font-size: 0.8rem;
+      width: auto;
+      margin: 0;
+    }
+
+    .btn-icon {
+      padding: 8px;
+      width: auto;
+      min-width: 36px;
+    }
+
+    .btn-group {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .btn-group.btn {
+      margin: 0;
+    }
+
+    /* Select */
+    select {
+      width: 100%;
+      padding: 12px 14px;
+      background: var(--bg-input);
+      color: var(--text-main);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 0.85rem;
+      cursor: pointer;
+      margin-bottom: 8px;
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%237a8599' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 12px center;
+    }
+
+    select:focus {
+      outline: none;
+      border-color: var(--c-accent);
+      box-shadow: 0 0 0 3px rgba(6, 182, 212, 0.15);
+    }
+
+    /* Solución de Problemas (Troubleshooting) */
+    .troubleshoot-card {
+      background: var(--bg-card);
+      border: 1px dashed var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+      margin-top: auto;
+    }
+
+    .troubleshoot-header {
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .troubleshoot-header:hover {
+      background: var(--bg-hover);
+    }
+
+    .troubleshoot-header-text {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    .troubleshoot-chevron {
+      transition: transform 0.2s;
+      color: var(--text-muted);
+    }
+
+    .troubleshoot-card.open .troubleshoot-chevron {
+      transform: rotate(180deg);
+    }
+
+    .troubleshoot-body {
+      display: none;
+      padding: 16px;
+      border-top: 1px solid var(--border);
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      max-height: 300px;
+      overflow-y: auto;
+    }
+
+    .troubleshoot-card.open .troubleshoot-body {
+      display: block;
+    }
+
+    .troubleshoot-section {
+      margin-bottom: 16px;
+    }
+
+    .troubleshoot-section:last-child {
+      margin-bottom: 0;
+    }
+
+    .troubleshoot-section h4 {
+      color: var(--c-warning);
+      font-size: 0.8rem;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .troubleshoot-section ul {
+      padding-left: 20px;
+      margin: 0;
+    }
+
+    .troubleshoot-section li {
+      margin-bottom: 4px;
+    }
+
+    .troubleshoot-section code {
+      background: var(--bg-dark);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: 'Cascadia Code', 'Fira Code', monospace;
+      font-size: 0.7rem;
+    }
+
+    /* ============================================================
+       PANEL CENTRAL - Editor JSON
+       ============================================================ */
+    .editor-container {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+
+    #jsonEditor {
+      width: 100%;
+      flex: 1;
+      min-height: 400px;
+      background: var(--bg-input);
+      color: #e2e8f0;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      resize: none;
+      font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+      font-size: 13px;
+      line-height: 1.6;
+      padding: 16px;
+      outline: none;
+    }
+
+    #jsonEditor:focus {
+      border-color: var(--c-accent);
+      box-shadow: 0 0 0 3px rgba(6, 182, 212, 0.1);
+    }
+
+    .editor-toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 0 0;
+      gap: 12px;
+      flex-shrink: 0;
+    }
+
+    .editor-stats {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    .editor-stat {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .json-status {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+
+    .json-status.valid {
+      background: var(--c-success-bg);
+      color: var(--c-success);
+    }
+
+    .json-status.invalid {
+      background: var(--c-error-bg);
+      color: var(--c-error);
+    }
+
+    .editor-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    /* ============================================================
+       PANEL DERECHO - Log de Transacciones
+       ============================================================ */
+    .log-container {
+      flex: 1;
+      overflow-y: auto;
+      background: var(--bg-dark);
+      font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+      font-size: 0.75rem;
+    }
+
+    .log-entry {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 10px 16px;
+      border-bottom: 1px solid rgba(45, 58, 77, 0.5);
+      transition: background 0.15s;
+    }
+
+    .log-entry:hover {
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .log-time {
+      color: var(--text-dim);
+      font-size: 0.7rem;
+      flex-shrink: 0;
+      min-width: 70px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .log-badge {
+      flex-shrink: 0;
+      min-width: 60px;
+      padding: 3px 8px;
+      text-align: center;
+      border-radius: 4px;
+      font-weight: 700;
+      font-size: 0.65rem;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+
+    /* Colores vibrantes para los badges del log */
+    .log-badge.sent {
+      background: linear-gradient(135deg, #a855f7 0%, #9333ea 100%);
+      color: #fff;
+      box-shadow: 0 2px 8px rgba(168, 85, 247, 0.3);
+    }
+
+    .log-badge.ack {
+      background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+      color: #fff;
+      box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+    }
+
+    .log-badge.result {
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      color: #fff;
+      box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+    }
+
+    .log-badge.error {
+      background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+      color: #fff;
+      box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3);
+    }
+
+    .log-badge.info {
+      background: var(--bg-input);
+      color: var(--text-muted);
+      border: 1px solid var(--border);
+      box-shadow: none;
+    }
+
+    .log-badge.pong {
+      background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%);
+      color: #fff;
+      box-shadow: 0 2px 8px rgba(6, 182, 212, 0.3);
+    }
+
+    .log-badge.status {
+      background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+      color: #fff;
+      box-shadow: 0 2px 8px rgba(139, 92, 246, 0.3);
+    }
+
+    .log-message {
+      flex: 1;
+      word-break: break-word;
+      color: var(--text-main);
+      line-height: 1.5;
+    }
+
+    .log-message.error-text {
+      color: var(--c-error);
+    }
+
+    .log-message.success-text {
+      color: var(--c-success);
+    }
+
+    /* Footer del Log */
+    .log-footer {
+      display: flex;
+      gap: 8px;
+      padding: 12px 16px;
+      background: var(--bg-card);
+      border-top: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    .log-footer.btn {
+      flex: 1;
+      margin: 0;
+    }
+
+    /* ============================================================
+       MODAL
+       ============================================================ */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.8);
+      backdrop-filter: blur(4px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+
+    .modal-overlay.show {
+      display: flex;
+    }
+
+    .modal-box {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 32px;
+      max-width: 420px;
+      text-align: center;
+      box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5);
+    }
+
+    .modal-icon {
+      font-size: 3.5rem;
+      margin-bottom: 20px;
+    }
+
+    .modal-title {
+      font-size: 1.3rem;
+      font-weight: 700;
+      margin-bottom: 12px;
+    }
+
+    .modal-text {
+      color: var(--text-muted);
+      margin-bottom: 24px;
+      line-height: 1.6;
+    }
+
+    .modal-buttons {
+      display: flex;
+      gap: 12px;
+    }
+
+    .modal-buttons.btn {
+      flex: 1;
+      margin: 0;
+    }
+
+    /* ============================================================
+       NOTIFICACIONES (TOASTS)
+       ============================================================ */
+    .toast-container {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      z-index: 1001;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .toast {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px 18px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      animation: toastIn 0.3s ease-out;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+      min-width: 280px;
+    }
+
+    .toast.success {
+      border-left: 4px solid var(--c-success);
+    }
+
+    .toast.error {
+      border-left: 4px solid var(--c-error);
+    }
+
+    .toast.warning {
+      border-left: 4px solid var(--c-warning);
+    }
+
+    .toast.info {
+      border-left: 4px solid var(--c-info);
+    }
+
+    .toast-icon {
+      font-size: 1.2rem;
+    }
+
+    .toast-message {
+      flex: 1;
+      font-size: 0.85rem;
+    }
+
+    @keyframes toastIn {
+      from {
+        opacity: 0;
+        transform: translateX(100px);
+      }
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }
+
+    /* ============================================================
+       RESPONSIVE
+       ============================================================ */
+    @media (max-width: 1400px) {
+      .dashboard {
+        grid-template-columns: 280px 1fr 360px;
+      }
+    }
+
+    @media (max-width: 1100px) {
+      .dashboard {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto 1fr auto;
+      }
+
+      .panel:first-child {
+        max-height: 280px;
+      }
+
+      .panel:last-child {
+        max-height: 300px;
+      }
+
+      .header-center {
+        display: none;
+      }
+    }
+  </style>
 </head>
 <body>
-<div class="container">
-    <h1>🎫 Ticket Daemon - Test Client</h1>
 
-    <div class="status-bar">
-        <div class="status-item">
-            <div class="status-dot" id="statusDot"></div>
-            <span id="statusText">Desconectado</span>
-        </div>
-        <div class="status-item">
-            <span>Cola: <strong id="queueStatus">-/-</strong></span>
-        </div>
-        <div class="status-item">
-            <span>Clientes: <strong id="clientCount">-</strong></span>
-        </div>
-    </div>
+<header>
+  <div class="brand">
+    <div class="brand-icon">🎫</div>
+    <div class="brand-text">Ticket <span>Daemon</span></div>
+  </div>
 
-    <div class="panel">
-        <h2>📄 Documento JSON (Formato Poster)</h2>
-        <textarea id="jsonInput">{
-  "version": "1.0",
-  "profile": {
-    "model": "58mm PT-210",
-    "paper_width": 58,
-    "dpi": 203,
-    "has_qr": true
-  },
-  "commands": [
-    {
-      "type": "raw",
-      "data": {
-        "hex": "1B 40",
-        "comment": "Inicializar impresora"
-      }
-    },
-    {
-      "type": "pulse",
-      "data": { "pin": 0 }
-    },
-    {
-      "type": "beep",
-      "data": { "times": 1, "lapse": 1 }
-    },
-    {
-      "type": "image",
-      "data": {
-        "code": "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",
-        "align": "center",
-        "pixel_width": 200
-      }
-    },
-    {
-      "type": "text",
-      "data": {
-        "content": {
-          "text": "KEMPER URGATE",
-          "content_style": { "align": "center", "bold": true, "size": "2x2" }
-        },
-        "new_line": true
-      }
-    },
-    {
-      "type": "text",
-      "data": {
-        "content": { "text": "RFC: EKU9003173C9", "align": "center" },
-        "new_line": true
-      }
-    },
-    {
-      "type": "separator",
-      "data": { "char": "-", "length": 32 }
-    },
-    {
-      "type": "text",
-      "data": {
-        "label": { "text": "Folio", "label_style": { "bold": true } },
-        "content": { "text": "0002" }
-      }
-    },
-    {
-      "type": "text",
-      "data": {
-        "label": { "text": "Fecha", "label_style": { "bold": true } },
-        "content": { "text": "2025-11-19 14:53" }
-      }
-    },
-    {
-      "type": "separator",
-      "data": { "char": ".", "length": 32 }
-    },
-    {
-      "type": "table",
-      "data": {
-        "definition": {
-          "columns": [
-            { "name": "Cant", "width": 4, "align": "left" },
-            { "name": "Producto", "width": 16, "align": "center" },
-            { "name": "Total", "width": 10, "align": "right" }
-          ]
-        },
-        "rows": [
-          ["1.0", "MALETIN", "$1,060.00"]
-        ],
-        "options": { "header_bold": true, "column_spacing": 1 }
-      }
-    },
-    {
-      "type": "separator",
-      "data": { "char": "-", "length": 32 }
-    },
-    {
-      "type": "text",
-      "data": {
-        "content": {
-          "text": "TOTAL: $1,060.00 MXN",
-          "align": "right",
-          "content_style": { "bold": true }
-        }
-      }
-    },
-    {
-      "type": "feed",
-      "data": { "lines": 1 }
-    },
-    {
-      "type": "barcode",
-      "data": {
-        "symbology": "code128",
-        "data": "20250109",
-        "height": 50,
-        "hri_position": "below",
-        "align": "center"
-      }
-    },
-    {
-      "type": "feed",
-      "data": { "lines": 1 }
-    },
-    {
-      "type": "qr",
-      "data": {
-        "data": "https://factura.ejemplo.com/verify?folio=2",
-        "human_text": "Escanea para Factura",
-        "pixel_width": 150,
-        "align": "center"
-      }
-    },
-    {
-      "type": "feed",
-      "data": { "lines": 1 }
-    },
-    {
-      "type": "text",
-      "data": {
-        "content": {
-          "text": "GRACIAS POR SU COMPRA",
-          "align": "center",
-          "content_style": { "bold": true, "inverse": true }
-        }
-      }
-    },
-    {
-      "type": "feed",
-      "data": { "lines": 1 }
-    },
-    {
-      "type": "cut",
-      "data": { "mode": "partial", "feed": 0 }
-    }
-  ]
-}</textarea>
-        <button id="btnSend">📤 Enviar Ticket</button>
-        <button id="btnStatus" class="secondary">📊 Estado Cola</button>
-        <button id="btnPing" class="secondary">🏓 Ping</button>
-        <button id="btnClear" class="secondary">🗑️ Limpiar Log</button>
+  <div class="header-center">
+    <div class="header-stat">
+      <span class="header-stat-label">Uptime: </span>
+      <span class="header-stat-value" id="uptimeVal">--</span>
     </div>
+    <div class="header-stat">
+      <span class="header-stat-label">Procesados:</span>
+      <span class="header-stat-value success" id="processedVal">0</span>
+    </div>
+    <div class="header-stat">
+      <span class="header-stat-label">Fallidos:</span>
+      <span class="header-stat-value error" id="failedVal">0</span>
+    </div>
+  </div>
 
-    <div class="panel">
-        <h2>📋 Log de Mensajes</h2>
-        <div class="log" id="logContainer"></div>
+  <div id="connStatus" class="conn-badge offline">
+    <span class="conn-dot"></span>
+    <span>Conectando...</span>
+  </div>
+</header>
+
+<div class="dashboard">
+
+  <div class="panel">
+    <div class="panel-header">
+      <div class="panel-title">
+        <span class="panel-title-icon">📊</span>
+        Estado del Sistema
+      </div>
+      <button class="btn btn-icon btn-sm" id="btnRefresh" title="Actualizar">🔄</button>
     </div>
+    <div class="panel-content">
+
+      <div class="metrics-grid">
+        <div class="metric-card">
+          <div class="metric-header">
+            <span class="metric-label">Cola (Queue)</span>
+            <span class="metric-icon">📋</span>
+          </div>
+          <div class="metric-value info" id="queueVal">0 / 100</div>
+          <div class="queue-bar-container">
+            <div class="queue-bar-labels">
+              <span>0%</span>
+              <span id="queuePct">0%</span>
+            </div>
+            <div class="queue-bar-track">
+              <div class="queue-bar-fill" id="queueBar"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="metric-card">
+          <div class="metric-header">
+            <span class="metric-label">Procesador</span>
+            <span class="metric-icon">⚙️</span>
+          </div>
+          <div class="metric-value muted" id="workerVal">--</div>
+          <div class="metric-sub" id="workerSub">Esperando datos...</div>
+        </div>
+
+        <div class="metric-card">
+          <div class="metric-header">
+            <span class="metric-label">Entorno</span>
+            <span class="metric-icon">🌐</span>
+          </div>
+          <div class="metric-value" id="envVal" style="font-size: 1.1rem;">--</div>
+          <div class="metric-sub" id="buildInfo">--</div>
+        </div>
+
+        <div class="metric-card">
+          <div class="metric-header">
+            <span class="metric-label">Trabajos Enviados</span>
+            <span class="metric-icon">📤</span>
+          </div>
+          <div class="metric-value success" id="jobsSentVal">0</div>
+          <div class="metric-sub">Esta sesión</div>
+        </div>
+      </div>
+
+      <div class="section-label">📄 Plantillas</div>
+      <select id="templateSelect">
+        <option value="simple">✅ Texto Simple (Prueba Básica)</option>
+        <option value="receipt">🧾 Ticket Completo</option>
+        <option value="barcode">📊 Prueba de Código de Barras</option>
+        <option value="qr">📱 Prueba de Código QR</option>
+        <option value="table">📋 Prueba de Tablas</option>
+        <option value="raw">⚡ Comandos Raw ESC/POS</option>
+        <option value="burstable">🔥 Modo Ráfaga (Sin Papel)</option>
+      </select>
+      <button class="btn" id="btnLoad">📥 Cargar Plantilla</button>
+
+      <div class="section-label">🎯 Acciones</div>
+      <button class="btn btn-primary" id="btnSend" disabled>🖨️ Enviar Trabajo de Impresión</button>
+      <button class="btn btn-danger" id="btnBurst" disabled>🔥 Modo Ráfaga (×10)</button>
+      <div class="btn-group">
+        <button class="btn" id="btnPing">🏓 Ping</button>
+        <button class="btn" id="btnStatus">📊 Estado</button>
+      </div>
+
+      <div class="troubleshoot-card" id="troubleshootCard">
+        <div class="troubleshoot-header" id="troubleshootToggle">
+          <span class="troubleshoot-header-text">
+            <span>🔧</span>
+            <span>Guía de Solución de Problemas</span>
+          </span>
+          <span class="troubleshoot-chevron">▼</span>
+        </div>
+        <div class="troubleshoot-body">
+          <div class="troubleshoot-section">
+            <h4>🔴 Problemas de Conexión</h4>
+            <ul>
+              <li>Verificar servicio: <code>task status</code></li>
+              <li>Revisar firewall puerto 8766</li>
+              <li>Confirmar URL del WebSocket</li>
+            </ul>
+          </div>
+          <div class="troubleshoot-section">
+            <h4>🔴 Fallos de Impresión</h4>
+            <ul>
+              <li>Revisar nombre en <code>profile.model</code></li>
+              <li>Verificar servicio Print Spooler</li>
+              <li>Revisar logs: <code>task logs</code></li>
+            </ul>
+          </div>
+          <div class="troubleshoot-section">
+            <h4>🔴 Cola Llena</h4>
+            <ul>
+              <li>El worker podría estar atascado</li>
+              <li>Impresora desconectada o error</li>
+              <li>Reiniciar: <code>task restart</code></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-header">
+      <div class="panel-title">
+        <span class="panel-title-icon">📝</span>
+        Carga JSON (Payload)
+      </div>
+      <div class="json-status" id="jsonStatus">
+        <span>⏳</span>
+        <span>Verificando...</span>
+      </div>
+    </div>
+    <div class="panel-content">
+      <div class="editor-container">
+        <textarea id="jsonEditor" spellcheck="false"
+                  placeholder="Pega aquí el JSON de tu trabajo de impresión... "></textarea>
+        <div class="editor-toolbar">
+          <div class="editor-stats">
+            <span class="editor-stat">
+              <span>📄</span>
+              <span id="lineCount">0 líneas</span>
+            </span>
+            <span class="editor-stat">
+              <span>⚡</span>
+              <span id="cmdCount">0 comandos</span>
+            </span>
+          </div>
+          <div class="editor-actions">
+            <button class="btn btn-sm" id="btnFormat">✨ Formatear</button>
+            <button class="btn btn-sm" id="btnCopy">📋 Copiar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-header">
+      <div class="panel-title">
+        <span class="panel-title-icon">📋</span>
+        Log de Transacciones
+      </div>
+      <span id="logCount" style="font-size:  0.75rem; color: var(--text-muted);">0 entradas</span>
+    </div>
+    <div class="log-container" id="logContainer"></div>
+    <div class="log-footer">
+      <button class="btn btn-sm" id="btnClearLogs">🗑️ Limpiar</button>
+      <button class="btn btn-sm" id="btnExportLogs">📥 Exportar</button>
+    </div>
+  </div>
+
 </div>
 
+<div class="modal-overlay" id="burstModal">
+  <div class="modal-box">
+    <div class="modal-icon">🔥</div>
+    <div class="modal-title">Confirmar Modo Ráfaga</div>
+    <div class="modal-text">
+      Esto enviará inmediatamente <strong>10 trabajos de impresión</strong> a la cola.
+      <br><br>
+      ⚠️ Usa la plantilla "Modo Ráfaga" para evitar desperdicio de papel (solo pitidos).
+    </div>
+    <div class="modal-buttons">
+      <button class="btn" id="btnBurstCancel">Cancelar</button>
+      <button class="btn btn-danger" id="btnBurstConfirm">🔥 Ejecutar</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast-container" id="toastContainer"></div>
+
 <script>
-    const wsUrl = `ws://${window.location.hostname}:8766/ws`;
-    let socket = null;
-    let isConnected = false;
+  /* ==============================================================
+     CONFIGURACIÓN
+     ============================================================== */
+  const CONFIG = {
+    // [GUÍA DE INTEGRACIÓN] URL del WebSocket. Puerto por defecto 8766.
+    WS_URL: `ws://${window.location.hostname}:${window.location.port || 8766}/ws`,
+    HEALTH_URL: `http://${window.location.hostname}:${window.location.port || 8766}/health`,
+    POLL_INTERVAL: 2000,
+    MAX_LOGS: 200,
+    RECONNECT_DELAY: 3000
+  };
 
-    function updateStatus(connected) {
-        isConnected = connected;
-        document.getElementById('statusDot').classList.toggle('connected', connected);
-        document.getElementById('statusText').textContent = connected ? 'Conectado' : 'Desconectado';
-        document.getElementById('btnSend').disabled = !connected;
+  /* ==============================================================
+     ESTADO (STATE)
+     ============================================================== */
+  const state = {
+    socket: null,
+    isConnected: false,
+    jobsSent: 0,
+    logCount: 0,
+    pollTimer: null,
+    startTime: Date.now()
+  };
+
+  /* ==============================================================
+     ELEMENTOS DEL DOM
+     ============================================================== */
+  const el = {
+    connStatus: document.getElementById('connStatus'),
+    queueVal: document.getElementById('queueVal'),
+    queueBar: document.getElementById('queueBar'),
+    queuePct: document.getElementById('queuePct'),
+    workerVal: document.getElementById('workerVal'),
+    workerSub: document.getElementById('workerSub'),
+    envVal: document.getElementById('envVal'),
+    buildInfo: document.getElementById('buildInfo'),
+    jobsSentVal: document.getElementById('jobsSentVal'),
+    uptimeVal: document.getElementById('uptimeVal'),
+    processedVal: document.getElementById('processedVal'),
+    failedVal: document.getElementById('failedVal'),
+    jsonEditor: document.getElementById('jsonEditor'),
+    jsonStatus: document.getElementById('jsonStatus'),
+    lineCount: document.getElementById('lineCount'),
+    cmdCount: document.getElementById('cmdCount'),
+    logContainer: document.getElementById('logContainer'),
+    logCount: document.getElementById('logCount'),
+    templateSelect: document.getElementById('templateSelect'),
+    btnSend: document.getElementById('btnSend'),
+    btnBurst: document.getElementById('btnBurst'),
+    burstModal: document.getElementById('burstModal'),
+    troubleshootCard: document.getElementById('troubleshootCard')
+  };
+
+  /* ==============================================================
+     PLANTILLAS (TEMPLATES)
+     [GUÍA DE INTEGRACIÓN] Estructura requerida para los documentos de impresión
+     ============================================================== */
+  const TEMPLATES = {
+    simple: {
+      version: "1.0",
+      profile: {model: "58mm PT-210", paper_width: 58},
+      commands: [
+        {
+          type: "text",
+          data: {content: {text: "PRUEBA DE CONEXIÓN", align: "center", content_style: {bold: true, size: "2x1"}}}
+        },
+        {type: "text", data: {content: {text: new Date().toLocaleString(), align: "center"}}},
+        {type: "feed", data: {lines: 3}},
+        {type: "cut", data: {mode: "partial"}}
+      ]
+    },
+    receipt: {
+      version: "1.0",
+      profile: {model: "58mm PT-210", paper_width: 58},
+      commands: [
+        {type: "text", data: {content: {text: "MI TIENDA", align: "center", content_style: {bold: true, size: "2x2"}}}},
+        {type: "text", data: {content: {text: "Av. Principal 123", align: "center"}}},
+        {type: "separator", data: {char: "-", length: 32}},
+        {type: "text", data: {label: {text: "Fecha"}, content: {text: new Date().toLocaleDateString()}}},
+        {type: "text", data: {label: {text: "Hora"}, content: {text: new Date().toLocaleTimeString()}}},
+        {type: "separator", data: {char: ".", length: 32}},
+        {
+          type: "table",
+          data: {
+            definition: {columns: [{name: "Item", width: 16}, {name: "Precio", width: 10, align: "right"}]},
+            rows: [["Cafe", "$35.00"], ["Muffin", "$25.00"]],
+            options: {header_bold: true}
+          }
+        },
+        {type: "separator", data: {char: "-", length: 32}},
+        {type: "text", data: {content: {text: "TOTAL:  $60.00", align: "right", content_style: {bold: true}}}},
+        {type: "feed", data: {lines: 1}},
+        {type: "text", data: {content: {text: "¡Gracias por su compra!", align: "center"}}},
+        {type: "feed", data: {lines: 3}},
+        {type: "cut", data: {mode: "partial"}}
+      ]
+    },
+    barcode: {
+      version: "1.0",
+      profile: {model: "58mm PT-210", paper_width: 58},
+      commands: [
+        {type: "text", data: {content: {text: "PRUEBA CÓDIGO BARRAS", align: "center", content_style: {bold: true}}}},
+        {type: "feed", data: {lines: 1}},
+        {
+          type: "barcode",
+          data: {symbology: "code128", data: "ABC123456", height: 60, hri_position: "below", align: "center"}
+        },
+        {type: "feed", data: {lines: 3}},
+        {type: "cut", data: {mode: "partial"}}
+      ]
+    },
+    qr: {
+      version: "1.0",
+      profile: {model: "58mm PT-210", paper_width: 58, has_qr: true},
+      commands: [
+        {type: "text", data: {content: {text: "PRUEBA CÓDIGO QR", align: "center", content_style: {bold: true}}}},
+        {type: "feed", data: {lines: 1}},
+        {
+          type: "qr",
+          data: {
+            data: "https://github.com/adcondev/ticket-daemon",
+            human_text: "Escanear Docs",
+            pixel_width: 150,
+            align: "center"
+          }
+        },
+        {type: "feed", data: {lines: 3}},
+        {type: "cut", data: {mode: "partial"}}
+      ]
+    },
+    table: {
+      version: "1.0",
+      profile: {model: "58mm PT-210", paper_width: 58},
+      commands: [
+        {type: "text", data: {content: {text: "PRUEBA DE TABLA", align: "center", content_style: {bold: true}}}},
+        {type: "separator", data: {char: "=", length: 32}},
+        {
+          type: "table",
+          data: {
+            definition: {
+              columns: [{name: "ID", width: 4}, {name: "Prod", width: 14}, {
+                name: "Cant",
+                width: 4,
+                align: "right"
+              }]
+            },
+            rows: [["01", "Pieza A", "5"], ["02", "Pieza B", "10"], ["03", "Pieza X", "3"]],
+            options: {header_bold: true, column_spacing: 1}
+          }
+        },
+        {type: "separator", data: {char: "=", length: 32}},
+        {type: "feed", data: {lines: 3}},
+        {type: "cut", data: {mode: "partial"}}
+      ]
+    },
+    raw: {
+      version: "1.0",
+      profile: {model: "58mm PT-210", paper_width: 58},
+      commands: [
+        {type: "raw", data: {hex: "1B 40", comment: "Inicializar impresora", safe_mode: true}},
+        {type: "text", data: {content: {text: "¡Comando RAW ejecutado!", align: "center"}}},
+        {type: "beep", data: {times: 2, lapse: 1}},
+        {type: "feed", data: {lines: 3}},
+        {type: "cut", data: {mode: "partial"}}
+      ]
+    },
+    burstable: {
+      version: "1.0",
+      profile: {model: "58mm PT-210", paper_width: 58},
+      commands: [
+        {type: "beep", data: {times: 1, lapse: 1}}
+      ]
     }
+  };
 
-    function addLog(type, message) {
-        const container = document.getElementById('logContainer');
-        const time = new Date().toLocaleTimeString();
-        const entry = document.createElement('div');
-        entry.className = 'log-entry';
-        entry.innerHTML = `<span class="log-time">[${time}]</span> <span class="log-type ${type}">${type.toUpperCase()}</span>:  ${escapeHtml(message)}`;
-        container.appendChild(entry);
-        container.scrollTop = container.scrollHeight;
-    }
+  /* ==============================================================
+     WEBSOCKET
+     ============================================================== */
+  function connectWebSocket() {
+    addLog('INFO', `Conectando a ${CONFIG.WS_URL}...`);
+    state.socket = new WebSocket(CONFIG.WS_URL);
 
-    function escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-    }
+    state.socket.onopen = () => {
+      state.isConnected = true;
+      updateConnectionUI(true);
+      addLog('INFO', '✅ Conectado al Ticket Daemon');
+      showToast('Conectado al servicio', 'success');
+      fetchHealth();
+    };
 
-    function connect() {
-        socket = new WebSocket(wsUrl);
+    state.socket.onclose = () => {
+      state.isConnected = false;
+      updateConnectionUI(false);
+      addLog('ERROR', '❌ Conexión perdida. Reintentando...');
+      setTimeout(connectWebSocket, CONFIG.RECONNECT_DELAY);
+    };
 
-        socket.onopen = () => {
-            updateStatus(true);
-            addLog('info', 'Conexión establecida');
-        };
+    state.socket.onerror = () => {
+      addLog('ERROR', '⚠️ Error de WebSocket');
+    };
 
-        socket.onmessage = (event) => {
-            try {
-                const data = JSON.parse(event.data);
-                addLog(data.tipo || 'message', JSON.stringify(data));
+    state.socket.onmessage = (event) => {
+      try {
+        const msg = JSON.parse(event.data);
+        handleMessage(msg);
+      } catch {
+        addLog('INFO', event.data);
+      }
+    };
+  }
 
-                if (data.position !== undefined) {
-                    document.getElementById('queueStatus').textContent = data.position + '/100';
-                }
-            } catch (e) {
-                addLog('message', event.data);
-            }
-        };
+  // [GUÍA DE INTEGRACIÓN] Manejo de respuestas del servidor
+  function handleMessage(msg) {
+    const tipo = (msg.tipo || 'info').toLowerCase();
 
-        socket.onclose = () => {
-            updateStatus(false);
-            addLog('info', 'Conexión cerrada, reconectando...');
-            setTimeout(connect, 3000);
-        };
-
-        socket.onerror = (err) => {
-            addLog('error', 'Error de conexión');
-        };
-    }
-
-    document.getElementById('btnSend').addEventListener('click', () => {
-        if (!socket || !isConnected) return;
-
-        try {
-            const jsonData = JSON.parse(document.getElementById('jsonInput').value);
-            const message = {
-                tipo: 'ticket',
-                id: 'test-' + Date.now(),
-                datos: jsonData
-            };
-            socket.send(JSON.stringify(message));
-            addLog('sent', 'Ticket enviado:  ' + message.id);
-        } catch (e) {
-            addLog('error', 'JSON inválido:  ' + e.message);
+    switch (tipo) {
+      case 'info':
+        addLog('INFO', msg.mensaje || JSON.stringify(msg));
+        break;
+      case 'ack': // Confirmación de que el trabajo entró a la cola
+        addLog('ACK', `📥 Encolado: ${msg.id} (Posición: ${msg.current ?? 0}/${msg.capacity ?? 100})`);
+        fetchHealth();
+        break;
+      case 'result': // Resultado final de la impresión (éxito o fallo)
+        if (msg.status === 'success') {
+          addLog('RESULT', `✅ Completado: ${msg.id} — ${msg.mensaje}`, 'success');
+          showToast('¡Impresión completada! ', 'success');
+        } else {
+          addLog('ERROR', `❌ Falló [${msg.id}]: ${msg.mensaje}`, 'error');
+          showToast('Error de impresión', 'error');
         }
+        fetchHealth();
+        break;
+      case 'error': // Error inmediato (validación, cola llena)
+        addLog('ERROR', `❌ ${msg.mensaje}`);
+        showToast(msg.mensaje, 'error');
+        break;
+      case 'pong':
+        addLog('PONG', `🏓 Pong (id: ${msg.id})`);
+        break;
+      case 'status':
+        const current = msg.current ?? 0;
+        const capacity = msg.capacity ?? 100;
+        addLog('STATUS', `📊 Cola: ${current}/${capacity}`);
+        updateQueueDisplay(current, capacity);
+        break;
+      default:
+        addLog('INFO', JSON.stringify(msg));
+    }
+  }
+
+  // [GUÍA DE INTEGRACIÓN] Función principal para enviar datos al servidor
+  function sendMessage(msg) {
+    if (!state.socket || !state.isConnected) {
+      showToast('No conectado', 'error');
+      return false;
+    }
+    state.socket.send(JSON.stringify(msg));
+    return true;
+  }
+
+  /* ==============================================================
+     POLLING DE SALUD (HEALTH)
+     ============================================================== */
+  async function fetchHealth() {
+    try {
+      const res = await fetch(CONFIG.HEALTH_URL);
+      if (!res.ok) throw new Error('Health falló');
+      const data = await res.json();
+
+      // Queue (Cola)
+      const current = data.queue?.current || 0;
+      const capacity = data.queue?.capacity || 100;
+      updateQueueDisplay(current, capacity);
+
+      // Worker (Procesador)
+      const running = data.worker?.running;
+      el.workerVal.textContent = running ? '🟢 Activo' : '🔴 Detenido';
+      el.workerVal.className = 'metric-value ' + (running ? 'success' : 'error');
+
+      const processed = data.worker?.jobs_processed || 0;
+      const failed = data.worker?.jobs_failed || 0;
+      el.workerSub.textContent = `${processed} procesados, ${failed} fallidos`;
+      el.processedVal.textContent = processed;
+      el.failedVal.textContent = failed;
+
+      // Environment (Entorno)
+      el.envVal.textContent = (data.build?.env || 'desconocido').toUpperCase();
+      el.buildInfo.textContent = `Build: ${data.build?.date || '--'} ${data.build?.time || ''}`;
+
+      // Uptime
+      const uptime = data.uptime_seconds || 0;
+      el.uptimeVal.textContent = formatUptime(uptime);
+
+    } catch {
+      el.workerVal.textContent = '⚫ Offline';
+      el.workerVal.className = 'metric-value muted';
+      el.workerSub.textContent = 'No se puede contactar al daemon';
+    }
+  }
+
+  function updateQueueDisplay(current, capacity) {
+    const pct = Math.round((current / capacity) * 100);
+    el.queueVal.textContent = `${current} / ${capacity}`;
+    el.queuePct.textContent = `${pct}%`;
+    el.queueBar.style.width = `${pct}%`;
+    el.queueBar.classList.toggle('warning', pct > 70);
+  }
+
+  function formatUptime(seconds) {
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = seconds % 60;
+    if (h > 0) return `${h}h ${m}m`;
+    if (m > 0) return `${m}m ${s}s`;
+    return `${s}s`;
+  }
+
+  /* ==============================================================
+     ACTUALIZACIONES DE UI
+     ============================================================== */
+  function updateConnectionUI(connected) {
+    el.connStatus.className = 'conn-badge ' + (connected ? 'online' : 'offline');
+    el.connStatus.innerHTML = `<span class="conn-dot"></span><span>${connected ? 'En Línea' : 'Desconectado'}</span>`;
+    el.btnSend.disabled = !connected;
+    el.btnBurst.disabled = !connected;
+  }
+
+  /* ==============================================================
+     LOGGING
+     ============================================================== */
+  function addLog(type, message, textClass = '') {
+    const time = new Date().toLocaleTimeString('es-MX', {hour12: false});
+    const entry = document.createElement('div');
+    entry.className = 'log-entry';
+
+    const badgeClass = type.toLowerCase();
+    const msgClass = textClass ? `log-message ${textClass}-text` : 'log-message';
+
+    entry.innerHTML = `
+      <span class="log-time">${time}</span>
+      <span class="log-badge ${badgeClass}">${type}</span>
+      <span class="${msgClass}">${escapeHtml(message)}</span>
+    `;
+
+    el.logContainer.appendChild(entry);
+    el.logContainer.scrollTop = el.logContainer.scrollHeight;
+
+    state.logCount++;
+    el.logCount.textContent = `${state.logCount} entradas`;
+
+    while (el.logContainer.children.length > CONFIG.MAX_LOGS) {
+      el.logContainer.removeChild(el.logContainer.firstChild);
+    }
+  }
+
+  function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+
+  /* ==============================================================
+     VALIDACIÓN JSON
+     ============================================================== */
+  function validateJSON() {
+    const input = el.jsonEditor.value;
+
+    try {
+      const doc = JSON.parse(input);
+      const errors = [];
+
+      if (!doc.version) errors.push('Falta versión');
+      if (!doc.profile?.model) errors.push('Falta profile.model');
+      if (!doc.commands?.length) errors.push('No hay comandos');
+
+      if (errors.length > 0) {
+        el.jsonStatus.className = 'json-status invalid';
+        el.jsonStatus.innerHTML = `<span>⚠️</span><span>${errors[0]}</span>`;
+        return false;
+      }
+
+      el.jsonStatus.className = 'json-status valid';
+      el.jsonStatus.innerHTML = '<span>✅</span><span>Válido</span>';
+
+      el.lineCount.textContent = `${input.split('\n').length} líneas`;
+      el.cmdCount.textContent = `${doc.commands?.length || 0} comandos`;
+
+      return true;
+    } catch {
+      el.jsonStatus.className = 'json-status invalid';
+      el.jsonStatus.innerHTML = '<span>❌</span><span>JSON Inválido</span>';
+      return false;
+    }
+  }
+
+  /* ==============================================================
+     TOASTS (Notificaciones)
+     ============================================================== */
+  function showToast(message, type = 'info') {
+    const container = document.getElementById('toastContainer');
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+
+    const icons = {success: '✅', error: '❌', warning: '⚠️', info: 'ℹ️'};
+    toast.innerHTML = `
+      <span class="toast-icon">${icons[type]}</span>
+      <span class="toast-message">${escapeHtml(message)}</span>
+    `;
+
+    container.appendChild(toast);
+
+    setTimeout(() => {
+      toast.style.opacity = '0';
+      toast.style.transform = 'translateX(100px)';
+      setTimeout(() => toast.remove(), 300);
+    }, 3500);
+  }
+
+  /* ==============================================================
+     MANEJADORES DE EVENTOS (EVENT HANDLERS)
+     ============================================================== */
+
+  // Cargar Plantilla
+  document.getElementById('btnLoad').addEventListener('click', () => {
+    const key = el.templateSelect.value;
+    const template = TEMPLATES[key];
+    if (template) {
+      el.jsonEditor.value = JSON.stringify(template, null, 2);
+      validateJSON();
+      addLog('INFO', `📄 Plantilla cargada: ${key}`);
+    }
+  });
+
+  // Enviar Trabajo de Impresión
+  // [GUÍA DE INTEGRACIÓN] Ejemplo de envío de un ticket
+  el.btnSend.addEventListener('click', () => {
+    if (!validateJSON()) {
+      showToast('Corrije los errores del JSON primero', 'error');
+      return;
+    }
+
+    try {
+      const payload = JSON.parse(el.jsonEditor.value);
+      const jobId = `job-${Date.now()}`;
+      // Estructura del mensaje: { tipo: 'ticket', id: '...', datos: { ... } }
+      const msg = {tipo: 'ticket', id: jobId, datos: payload};
+
+      if (sendMessage(msg)) {
+        addLog('SENT', `📤 Trabajo:  ${jobId}`);
+        state.jobsSent++;
+        el.jobsSentVal.textContent = state.jobsSent;
+      }
+    } catch (e) {
+      addLog('ERROR', `Envío fallido: ${e.message}`);
+    }
+  });
+
+  // Modo Ráfaga
+  el.btnBurst.addEventListener('click', () => {
+    el.burstModal.classList.add('show');
+  });
+
+  document.getElementById('btnBurstCancel').addEventListener('click', () => {
+    el.burstModal.classList.remove('show');
+  });
+
+  document.getElementById('btnBurstConfirm').addEventListener('click', () => {
+    el.burstModal.classList.remove('show');
+
+    let payload;
+    try {
+      payload = JSON.parse(el.jsonEditor.value);
+    } catch {
+      payload = TEMPLATES.burstable;
+      addLog('INFO', '⚠️ Usando plantilla Ráfaga');
+    }
+
+    addLog('INFO', '🔥 RÁFAGA: Enviando 10 trabajos...');
+
+    for (let i = 0; i < 10; i++) {
+      const jobId = `burst-${Date.now()}-${i}`;
+      if (sendMessage({tipo: 'ticket', id: jobId, datos: payload})) {
+        state.jobsSent++;
+      }
+    }
+
+    el.jobsSentVal.textContent = state.jobsSent;
+    showToast('Ráfaga: ¡10 trabajos enviados! ', 'warning');
+    setTimeout(fetchHealth, 100);
+  });
+
+  // Ping
+  document.getElementById('btnPing').addEventListener('click', () => {
+    const id = `ping-${Date.now()}`;
+    if (sendMessage({tipo: 'ping', id})) {
+      addLog('SENT', `🏓 Ping (${id})`);
+    }
+  });
+
+  // Estado
+  document.getElementById('btnStatus').addEventListener('click', () => {
+    if (sendMessage({tipo: 'status'})) {
+      addLog('SENT', '📊 Solicitud de estado');
+    }
+  });
+
+  // Actualizar (Refresh)
+  document.getElementById('btnRefresh').addEventListener('click', () => {
+    fetchHealth();
+    showToast('Actualizado', 'info');
+  });
+
+  // Limpiar Logs
+  document.getElementById('btnClearLogs').addEventListener('click', () => {
+    el.logContainer.innerHTML = '';
+    state.logCount = 0;
+    el.logCount.textContent = '0 entradas';
+  });
+
+  // Exportar Logs
+  document.getElementById('btnExportLogs').addEventListener('click', () => {
+    const entries = el.logContainer.querySelectorAll('.log-entry');
+    const lines = Array.from(entries).map(e => {
+      const time = e.querySelector('.log-time').textContent;
+      const type = e.querySelector('.log-badge').textContent;
+      const msg = e.querySelector('.log-message').textContent;
+      return `[${time}] ${type}: ${msg}`;
     });
 
-    document.getElementById('btnStatus').addEventListener('click', () => {
-        if (!socket || !isConnected) return;
-        socket.send(JSON.stringify({tipo: 'status'}));
-        addLog('sent', 'Solicitud de estado');
-    });
+    const blob = new Blob([lines.join('\n')], {type: 'text/plain'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `ticket-daemon-${Date.now()}.log`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('Logs exportados', 'success');
+  });
 
-    document.getElementById('btnPing').addEventListener('click', () => {
-        if (!socket || !isConnected) return;
-        socket.send(JSON.stringify({tipo: 'ping', id: 'ping-' + Date.now()}));
-        addLog('sent', 'Ping enviado');
-    });
+  // Formatear JSON
+  document.getElementById('btnFormat').addEventListener('click', () => {
+    try {
+      const doc = JSON.parse(el.jsonEditor.value);
+      el.jsonEditor.value = JSON.stringify(doc, null, 2);
+      validateJSON();
+      showToast('Formateado', 'success');
+    } catch {
+      showToast('No se puede formatear JSON inválido', 'error');
+    }
+  });
 
-    document.getElementById('btnClear').addEventListener('click', () => {
-        document.getElementById('logContainer').innerHTML = '';
-    });
+  // Copiar JSON
+  document.getElementById('btnCopy').addEventListener('click', () => {
+    navigator.clipboard.writeText(el.jsonEditor.value);
+    showToast('Copiado al portapapeles', 'info');
+  });
 
-    connect();
+  // Toggle de Solución de Problemas
+  document.getElementById('troubleshootToggle').addEventListener('click', () => {
+    el.troubleshootCard.classList.toggle('open');
+  });
+
+  // Validación del editor al escribir
+  el.jsonEditor.addEventListener('input', validateJSON);
+
+  // Cerrar modal al hacer clic fuera
+  el.burstModal.addEventListener('click', (e) => {
+    if (e.target === el.burstModal) {
+      el.burstModal.classList.remove('show');
+    }
+  });
+
+  /* ==============================================================
+     INICIALIZACIÓN (INIT)
+     ============================================================== */
+  function init() {
+    el.jsonEditor.value = JSON.stringify(TEMPLATES.simple, null, 2);
+    validateJSON();
+    connectWebSocket();
+    state.pollTimer = setInterval(fetchHealth, CONFIG.POLL_INTERVAL);
+    fetchHealth();
+    addLog('INFO', '🚀 Dashboard inicializado');
+  }
+
+  init();
 </script>
 </body>
 </html>

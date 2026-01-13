@@ -40,7 +40,7 @@ type Response struct {
 	ID       string `json:"id,omitempty"`
 	Status   string `json:"status,omitempty"`
 	Mensaje  string `json:"mensaje,omitempty"`
-	Position int    `json:"position,omitempty"`
+	Current  int    `json:"current,omitempty"`
 	Capacity int    `json:"capacity,omitempty"`
 }
 
@@ -184,10 +184,13 @@ func (s *Server) handleTicket(ctx context.Context, conn *websocket.Conn, msg *Me
 			Tipo:     "ack",
 			ID:       jobID,
 			Status:   "queued",
-			Position: current,
+			Current:  current,
 			Capacity: capacity,
 			Mensaje:  "Job queued for printing",
 		}
+
+		log.Printf("[DEBUG] Sending ACK:  current=%d, capacity=%d", current, capacity)
+
 		_ = wsjson.Write(ctx, conn, response)
 
 	default:
@@ -205,7 +208,7 @@ func (s *Server) handleStatus(ctx context.Context, conn *websocket.Conn) {
 	response := Response{
 		Tipo:     "status",
 		Status:   "ok",
-		Position: current,
+		Current:  current,
 		Capacity: capacity,
 		Mensaje:  formatStatus(current, capacity),
 	}

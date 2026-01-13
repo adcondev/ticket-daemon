@@ -3,5 +3,5 @@ package assets
 
 import "embed"
 
-//go:embed web/*
+//go:embed web
 var WebFiles embed.FS

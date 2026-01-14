@@ -50,7 +50,7 @@ function handleMessage(msg) {
     case 'result': // Resultado final de la impresión (éxito o fallo)
       if (msg.status === 'success') {
         addLog('RESULT', `✅ Completado: ${msg.id} — ${msg.mensaje}`, 'success');
-        showToast('¡Impresión completada! ', 'success');
+        showToast('¡Impresión completada!', 'success');
       } else {
         addLog('ERROR', `❌ Falló [${msg.id}]: ${msg.mensaje}`, 'error');
         showToast('Error de impresión', 'error');

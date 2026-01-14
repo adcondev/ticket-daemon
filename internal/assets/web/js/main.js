@@ -37,7 +37,7 @@ function setupEventListeners() {
   // [GUÍA DE INTEGRACIÓN] Ejemplo de envío de un ticket
   el.btnSend.addEventListener('click', () => {
     if (!validateJSON()) {
-      showToast('Corrije los errores del JSON primero', 'error');
+      showToast('Corrige los errores del JSON primero', 'error');
       return;
     }
 
@@ -48,7 +48,7 @@ function setupEventListeners() {
       const msg = {tipo: 'ticket', id: jobId, datos: payload};
 
       if (sendMessage(msg)) {
-        addLog('SENT', `📤 Trabajo:  ${jobId}`);
+        addLog('SENT', `📤 Trabajo: ${jobId}`);
         state.jobsSent++;
         el.jobsSentVal.textContent = state.jobsSent;
       }
@@ -87,7 +87,7 @@ function setupEventListeners() {
     }
 
     el.jobsSentVal.textContent = state.jobsSent;
-    showToast('Ráfaga: ¡10 trabajos enviados! ', 'warning');
+    showToast('Ráfaga: ¡10 trabajos enviados!', 'warning');
     setTimeout(fetchHealth, 100);
   });
 

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"strconv"
 	"sync"
 	"time"
 
@@ -107,7 +108,10 @@ func (s *Server) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 
 	// Cleanup on disconnect
 	s.clients.Remove(conn)
-	conn.Close(websocket.StatusNormalClosure, "disconnected")
+	err = conn.Close(websocket.StatusNormalClosure, "disconnected")
+	if err != nil {
+		return
+	}
 	log.Printf("[WS] ➖ Client disconnected (remaining: %d)", s.clients.Count())
 }
 
@@ -258,23 +262,14 @@ func (s *Server) Shutdown() {
 
 		// Notify all clients
 		s.clients.ForEach(func(conn *websocket.Conn) {
-			conn.Close(websocket.StatusGoingAway, "Server shutting down")
+			err := conn.Close(websocket.StatusGoingAway, "Server shutting down")
+			if err != nil {
+				return
+			}
 		})
 	})
 }
 
 func formatStatus(current, capacity int) string {
-	return "Queue: " + itoa(current) + "/" + itoa(capacity)
-}
-
-func itoa(i int) string {
-	if i == 0 {
-		return "0"
-	}
-	result := ""
-	for i > 0 {
-		result = string(rune('0'+i%10)) + result
-		i /= 10
-	}
-	return result
+	return "Queue: " + strconv.Itoa(current) + "/" + strconv.Itoa(capacity)
 }

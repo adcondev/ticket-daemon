@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"runtime/debug"
 	"strings"
 	"sync"
 	"time"
@@ -239,9 +240,20 @@ func cleanErrorMessage(errStr string) string {
 }
 
 // executePrint performs the actual printing using Poster library
-func (w *Worker) executePrint(job *server.PrintJob) error {
+func (w *Worker) executePrint(job *server.PrintJob) (err error) {
+	// Capturar panics y convertirlos en errores
+	defer func() {
+		if r := recover(); r != nil {
+			// Asignar a la variable de retorno nombrada
+			err = fmt.Errorf("panic recovered in executePrint: %v", r)
+			log.Printf("[WORKER] 💥 Panic in job %s: %v\nStack:  %s",
+				job.ID, r, debug.Stack())
+		}
+	}()
+
 	// 1. Parse document from JSON
-	doc, err := w.parseDocument(job.Document)
+	var doc *schema.Document
+	doc, err = w.parseDocument(job.Document)
 	if err != nil {
 		return fmt.Errorf("error parseando documento: %w", err)
 	}

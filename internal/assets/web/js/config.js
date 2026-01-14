@@ -1,7 +1,7 @@
 /* ==============================================================
-   CONFIGURACIÓN
+   CONFIGURACION
    ============================================================== */
-// [GUÍA DE INTEGRACIÓN] URL del WebSocket. Puerto por defecto 8766.
+// [GUIA DE INTEGRACION] URL del WebSocket. Puerto por defecto 8766.
 const CONFIG = {
   WS_URL: `ws://${window.location.hostname}:${window.location.port || 8766}/ws`,
   HEALTH_URL: `http://${window.location.hostname}:${window.location.port || 8766}/health`,
@@ -12,7 +12,7 @@ const CONFIG = {
 
 /* ==============================================================
    PLANTILLAS (TEMPLATES)
-   [GUÍA DE INTEGRACIÓN] Estructura requerida para los documentos de impresión
+   [GUIA DE INTEGRACION] Estructura requerida para los documentos de impresion
    ============================================================== */
 const TEMPLATES = {
   simple: {
@@ -21,7 +21,7 @@ const TEMPLATES = {
     commands: [
       {
         type: "text",
-        data: {content: {text: "PRUEBA DE CONEXIÓN", align: "center", content_style: {bold: true, size: "2x1"}}}
+        data: {content: {text: "PRUEBA DE CONEXION", align: "center", content_style: {bold: true, size: "2x1"}}}
       },
       {type: "text", data: {content: {text: new Date().toLocaleString(), align: "center"}}},
       {type: "feed", data: {lines: 3}},
@@ -47,9 +47,9 @@ const TEMPLATES = {
         }
       },
       {type: "separator", data: {char: "-", length: 32}},
-      {type: "text", data: {content: {text: "TOTAL:  $60.00", align: "right", content_style: {bold: true}}}},
+      {type: "text", data: {content: {text: "TOTAL: $60.00", align: "right", content_style: {bold: true}}}},
       {type: "feed", data: {lines: 1}},
-      {type: "text", data: {content: {text: "¡Gracias por su compra!", align: "center"}}},
+      {type: "text", data: {content: {text: "Gracias por su compra!", align: "center"}}},
       {type: "feed", data: {lines: 3}},
       {type: "cut", data: {mode: "partial"}}
     ]
@@ -58,7 +58,7 @@ const TEMPLATES = {
     version: "1.0",
     profile: {model: "58mm PT-210", paper_width: 58},
     commands: [
-      {type: "text", data: {content: {text: "PRUEBA CÓDIGO BARRAS", align: "center", content_style: {bold: true}}}},
+      {type: "text", data: {content: {text: "PRUEBA CODIGO BARRAS", align: "center", content_style: {bold: true}}}},
       {type: "feed", data: {lines: 1}},
       {
         type: "barcode",
@@ -72,7 +72,7 @@ const TEMPLATES = {
     version: "1.0",
     profile: {model: "58mm PT-210", paper_width: 58, has_qr: true},
     commands: [
-      {type: "text", data: {content: {text: "PRUEBA CÓDIGO QR", align: "center", content_style: {bold: true}}}},
+      {type: "text", data: {content: {text: "PRUEBA CODIGO QR", align: "center", content_style: {bold: true}}}},
       {type: "feed", data: {lines: 1}},
       {
         type: "qr",
@@ -117,7 +117,7 @@ const TEMPLATES = {
     profile: {model: "58mm PT-210", paper_width: 58},
     commands: [
       {type: "raw", data: {hex: "1B 40", comment: "Inicializar impresora", safe_mode: true}},
-      {type: "text", data: {content: {text: "¡Comando RAW ejecutado!", align: "center"}}},
+      {type: "text", data: {content: {text: "Comando RAW ejecutado!", align: "center"}}},
       {type: "beep", data: {times: 2, lapse: 1}},
       {type: "feed", data: {lines: 3}},
       {type: "cut", data: {mode: "partial"}}

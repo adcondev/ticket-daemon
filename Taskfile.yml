@@ -69,6 +69,19 @@ tasks:
       TIME:
         sh: powershell -Command "Get-Date -Format 'HH:mm:ss'"
 
+  build-console:
+    desc: "Build standalone console executable (double-click to run)"
+    cmds:
+      - powershell -Command "if (!(Test-Path '{{.BUILD_DIR}}')) { New-Item -ItemType Directory -Path '{{.BUILD_DIR}}' -Force | Out-Null }"
+      - go build -ldflags "-s -w -X {{.MODULE}}.BuildEnvironment=test -X {{.MODULE}}.BuildDate={{.DATE}} -X {{.MODULE}}.BuildTime={{.TIME}}" -o {{.BUILD_DIR}}/TicketDaemon_Console.exe ./cmd/TicketServicio
+      - powershell -Command "Write-Host '✅ Built {{.BUILD_DIR}}/TicketDaemon_Console.exe (Console Mode)'"
+      - powershell -Command "Write-Host '   Double-click to run, Ctrl+C to stop'"
+    vars:
+      DATE:
+        sh: powershell -Command "Get-Date -Format 'yyyy-MM-dd'"
+      TIME:
+        sh: powershell -Command "Get-Date -Format 'HH:mm:ss'"
+
   run:
     desc: "Build and run locally (console mode)"
     deps: [ build ]
@@ -79,6 +92,20 @@ tasks:
       - echo    Press Ctrl+C to stop
       - echo
       - '{{.BUILD_DIR}}/{{.BINARY}}'
+
+  run-console:
+    desc: "Build and run in console mode (visible window)"
+    deps: [ build-console ]
+    cmds:
+      - echo
+      - echo ══════════════════════════════════════════════════════════
+      - echo   TICKET DAEMON - Console Mode
+      - echo   WebSocket:ws://localhost:8766/ws
+      - echo   Dashboard:http://localhost:8766
+      - echo   Press Ctrl+C to stop
+      - echo ══════════════════════════════════════════════════════════
+      - echo
+      - '{{.BUILD_DIR}}/TicketDaemon_Console.exe'
 
   # ══════════════════════════════════════════════════════════════════
   # SERVICE MANAGEMENT (Requires Administrator)

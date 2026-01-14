@@ -1,7 +1,5 @@
 # 🎫 Ticket Daemon
 
-![Ticket Daemon Logo](PLACEHOLDER_URL)
-
 ![Language](https://img.shields.io/badge/Go-1.24+-00ADD8?style=flat&logo=go&logoColor=white)
 ![Platform](https://img.shields.io/badge/Platform-Windows-0078D6?style=flat&logo=windows&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-green?style=flat)
@@ -10,15 +8,15 @@
 **Ticket Daemon** es un Servicio de Windows diseñado para entornos de producción retail. Actúa como un middleware
 robusto que conecta aplicaciones Web POS con impresoras térmicas físicas mediante WebSocket.
 
-El servicio gestiona la concurrencia de múltiples terminales, encola trabajos para garantizar el orden de impresión y
+El servicio gestiona la concurrencia de multiples terminales, encola trabajos para garantizar el orden de impresión y
 utiliza la librería **Poster** como motor de renderizado ESC/POS.
 
 ## ✨ Características Principales
 
 - 🔌 **Servidor WebSocket** de alto rendimiento (puerto 8766 por defecto).
 - 🛡️ **Protección de Backpressure**: Cola con buffer (100 slots) y rechazo inmediato si se satura.
-- 🪟 **Servicio Nativo Windows**: Integración completa con SCM (Service Control Manager).
-- 📝 **Logging Estructurado**: Rotación automática de archivos (5MB) para mantenimiento cero.
+- 🖨️ **Servicio Nativo Windows**:  Integración completa con SCM (Service Control Manager).
+- 📝 **Logging Estructurado**: Rotación automática de archivos (5 MB) para mantenimiento cero.
 - 🖨️ **Motor Poster**: Soporte avanzado para texto, códigos de barras, QR e imágenes.
 
 ---
@@ -27,68 +25,65 @@ utiliza la librería **Poster** como motor de renderizado ESC/POS.
 
 ### Estructura de Componentes
 
-El siguiente diagrama ilustra cómo el servicio envuelve los servidores HTTP/WS y coordina el flujo hacia el hardware.
+El siguiente diagrama ilustra como el servicio envuelve los servidores HTTP/WS y coordina el flujo hacia el hardware.
 
 ```mermaid
 graph TD
-%% Estilos
-    classDef go fill: #e1f5fe, stroke: #01579b, stroke-width: 2px, color: #000;
-    classDef data fill: #fff3e0, stroke: #e65100, stroke-width: 2px, color: #000;
-    classDef hw fill: #f3e5f5, stroke: #4a148c, stroke-width: 2px, color: #000;
-    subgraph Host["🖥️ Host del Servicio Windows (program.go)"]
+    classDef go fill:#e1f5fe,stroke:#01579b,stroke-width:2px,color:#000;
+    classDef data fill:#fff3e0,stroke:#e65100,stroke-width:2px,color:#000;
+    classDef hw fill:#f3e5f5,stroke:#4a148c,stroke-width:2px,color:#000;
+
+    subgraph Host["Host del Servicio Windows"]
         direction TB
         Service[Wrapper del Servicio]:::go -->|Init/Start| HTTP[Servidor HTTP]:::go
-        Service -->|Start/Stop| Worker[Worker de Impresión]:::go
+        Service -->|Start/Stop| Worker[Worker de Impresion]:::go
         HTTP -->|/ws| WSServer[Handler WebSocket]:::go
     end
 
-    subgraph Flow["🌊 Flujo de Datos"]
+    subgraph Flow["Flujo de Datos"]
         direction TB
         Client[Cliente Web POS]:::data <-->|JSON Messages| WSServer
-        WSServer -->|Push Job| Queue[("Canal (Buffer 100)")]:::data
+        WSServer -->|Push Job| Queue[Canal Buffer 100]:::data
         Queue -->|Pop Job| Worker
     end
 
-    subgraph Hardware["🖨️ Integración de Hardware (processor.go)"]
+    subgraph Hardware["Integracion de Hardware"]
         direction TB
-        Worker -->|Execute| PosterLib[Librería Poster]:::hw
+        Worker -->|Execute| PosterLib[Libreria Poster]:::hw
         PosterLib -->|Bytes ESC/POS| Spooler[Spooler de Windows]:::hw
-        Spooler -->|USB/Serial/LPT| Printer[Impresora Térmica]:::hw
+        Spooler -->|USB/Serial/LPT| Printer[Impresora Termica]:::hw
     end
-
 ```
 
 ### Modelo de Concurrencia (Fan-In)
 
-El sistema utiliza un patrón de **Fan-In** con un `Select` no bloqueante. Esto permite manejar múltiples conexiones
+El sistema utiliza un patron de **Fan-In** con un `Select` no bloqueante. Esto permite manejar multiples conexiones
 simultáneas sin bloquear el hilo principal si la impresora es lenta.
 
 ```mermaid
 graph TB
-%% Estilos
     classDef client fill: #e8f5e9, stroke: #2e7d32, stroke-width: 2px;
     classDef logic fill: #fff9c4, stroke: #fbc02d, stroke-width: 2px;
     classDef crit fill: #ffebee, stroke: #c62828, stroke-width: 2px;
     classDef core fill: #e3f2fd, stroke: #1565c0, stroke-width: 2px;
-    subgraph Clients["🌐 Capa HTTP/WS (Concurrente)"]
+    subgraph Clients["Capa HTTP/WS Concurrente"]
         C1[Cliente POS 1]:::client --> H1[Goroutine Handler 1]:::core
         C2[Cliente POS 2]:::client --> H2[Goroutine Handler 2]:::core
         C3[Cliente POS 3]:::client --> H3[Goroutine Handler 3]:::core
     end
 
-    subgraph Sync["⚙️ Sincronización (server.go)"]
+    subgraph Sync["Sincronizacion"]
         direction TB
-        H1 & H2 & H3 --> Select{Select: Non-blocking}:::logic
-        Select -- " Default (Lleno) " --> Overflow[("🚫 Error: Cola Llena")]:::crit
-        Select -- " Case Send " --> Channel[("📥 Canal (cap=100)")]:::core
+        H1 & H2 & H3 --> Select{Select Non-blocking}:::logic
+        Select -- " Default Lleno " --> Overflow[Error: Cola Llena]:::crit
+        Select -- " Case Send " --> Channel[Canal cap=100]:::core
     end
 
-    subgraph Process["🖨️ Procesamiento (Serial)"]
+    subgraph Process["Procesamiento Serial"]
         Channel --> WLoop[Worker Loop]:::core
         WLoop --> Mutex[Poster Executor]:::core
-        Mutex --> Hardware[Hardware Físico]:::crit
+        Mutex --> Hardware[Hardware Fisico]:::crit
     end
-
 ```
 
 ### Ciclo de Vida del Mensaje
@@ -97,10 +92,10 @@ graph TB
 sequenceDiagram
     participant C as Cliente Web
     participant H as WS Handler
-    participant Q as Cola (Canal)
+    participant Q as Cola Canal
     participant W as Worker
     participant P as Poster Engine
-    Note over C, H: Conexión establecida (ws://...)
+    Note over C, H: Conexion establecida ws://...
     C ->> H: {"tipo":"ticket", "datos":{...}}
 
     rect rgb(240, 248, 255)
@@ -120,17 +115,16 @@ sequenceDiagram
         Q ->> W: Pop PrintJob
         W ->> P: Execute(Document)
 
-        alt Éxito
+        alt Exito
             P -->> W: nil
             W ->> H: NotifyClient(Success)
             H -->> C: {"tipo":"result", "status":"success"}
         else Error
             P -->> W: error
             W ->> H: NotifyClient(Error)
-            H -->> C: {"tipo":"result", "status":"error", "mensaje":"..."}
+            H -->> C: {"tipo":"result", "status":"error", "mensaje":"... "}
         end
     end
-
 ```
 
 ---
@@ -139,22 +133,22 @@ sequenceDiagram
 
 ### Endpoints
 
-| Endpoint                       | Descripción            |
+| Endpoint                       | Descripcion            |
 |--------------------------------|------------------------|
-| `ws://localhost:8766/ws`       | Conexión WebSocket     |
+| `ws://localhost:8766/ws`       | Conexion WebSocket     |
 | `http://localhost:8766/health` | Health check (JSON)    |
 | `http://localhost:8766/`       | Cliente de prueba HTML |
 
 ### Tipos de Mensaje
 
-| Dirección | `tipo`   | Descripción                 |
+| Direccion | `tipo`   | Descripcion                 |
 |-----------|----------|-----------------------------|
-| C → S     | `ticket` | Enviar trabajo de impresión |
-| C → S     | `status` | Solicitar estado de la cola |
-| C → S     | `ping`   | Ping al servidor            |
-| S → C     | `ack`    | Trabajo aceptado y encolado |
-| S → C     | `result` | Trabajo completado/fallido  |
-| S → C     | `error`  | Error de validación/cola    |
+| C -> S    | `ticket` | Enviar trabajo de impresion |
+| C -> S    | `status` | Solicitar estado de la cola |
+| C -> S    | `ping`   | Ping al servidor            |
+| S -> C    | `ack`    | Trabajo aceptado y encolado |
+| S -> C    | `result` | Trabajo completado/fallido  |
+| S -> C    | `error`  | Error de validacion/cola    |
 
 ### Ejemplo de Payload
 
@@ -191,7 +185,6 @@ sequenceDiagram
     ]
   }
 }
-
 ```
 
 ---
@@ -202,7 +195,7 @@ La configuración se inyecta al compilar para garantizar inmutabilidad en produc
 
 | Ambiente       | Flag   | Puerto           | Log Verbose | Servicio             |
 |----------------|--------|------------------|-------------|----------------------|
-| **Producción** | `prod` | 8766 (0.0.0.0)   | `false`     | `TicketServicio`     |
+| **Produccion** | `prod` | 8766 (0.0.0.0)   | `false`     | `TicketServicio`     |
 | **Test/Dev**   | `test` | 8766 (localhost) | `true`      | `TicketServicioTest` |
 
 Para modificar los valores predeterminados, edite `internal/daemon/program.go` antes de compilar.
@@ -214,24 +207,49 @@ Para modificar los valores predeterminados, edite `internal/daemon/program.go` a
 ### Prerrequisitos
 
 * **Go 1.24+**
-* **Task** (go-task)
+* **Task** (go-task) - [Instalación](https://taskfile.dev/installation/)
 * Windows 10/11 o Windows Server
 
-### Comandos Comunes
+### Comandos Comunes (con Task)
 
 ```powershell
-# 1. Compilar y ejecutar localmente (modo consola)
+# Ver todos los comandos disponibles
+task
+
+# Compilar y ejecutar en modo consola (desarrollo)
 task run
 
-# 2. Instalar como Servicio de Windows (Admin)
+# Compilar ejecutable standalone (doble-clic para ejecutar)
+task build-console
+
+# Instalar como Servicio de Windows (requiere Admin)
 task install
 
-# 3. Ver logs en tiempo real
+# Ver logs en tiempo real
 task logs
 
-# 4. Abrir dashboard de diagnóstico
+# Abrir dashboard de diagnostico
 task open
 
+# Verificar estado del servicio
+task status
+```
+
+### Ejecutable Standalone (Sin Task)
+
+Si prefieres distribuir solo el `.exe`:
+
+```powershell
+# 1. Compilar
+task build-console
+
+# 2. El ejecutable queda en: 
+#    bin/TicketDaemon_Console.exe
+
+# 3. Doble-clic para ejecutar, o desde terminal:
+.\bin\TicketDaemon_Console.exe
+
+# 4. Abrir navegador en: http://localhost:8766
 ```
 
 ---
@@ -241,40 +259,82 @@ task open
 ```
 ticket-daemon/
 ├── cmd/
-│   └── ticketd/
+│   └── TicketServicio/
 │       └── ticket_servicio.go    # Punto de entrada (main)
 │
 ├── internal/
+│   ├── assets/
+│   │   ├── embed.go              # Go embed para archivos web
+│   │   └── web/                  # Dashboard HTML/CSS/JS
+│   │
 │   ├── daemon/
-│   │   ├── program.go            # Wrapper svc.Service y Configuración
-│   │   └── logger.go             # Logging filtrado con rotación
+│   │   ├── program.go            # Wrapper svc.Service y Configuracion
+│   │   ├── logger.go             # Logging filtrado con rotacion
+│   │   └── types.go              # Tipos de respuesta Health
 │   │
 │   ├── server/
-│   │   ├── server.go             # Lógica WebSocket y Cola (Select)
+│   │   ├── server.go             # Logica WebSocket y Cola (Select)
 │   │   └── clients.go            # Registro Thread-Safe de clientes
 │   │
 │   └── worker/
-│       └── processor.go          # Integración con librería Poster
-│
-├── web/
-│   └── index.html                # Dashboard embebido (Go embed)
+│       └── processor.go          # Integracion con libreria Poster
 │
 ├── go.mod
-├── Taskfile.yml                  # Automatización de tareas
-└── README_es.md
-
+├── Taskfile.yml                  # Automatizacion de tareas
+├── README.md
+└── LEARNING.md                   # Resumen tecnico para portfolio
 ```
 
 ---
 
-## 📝 Logs y Auditoría
+## 📝 Logs y Auditoria
 
-Los logs se escriben en `%PROGRAMDATA%` y rotan automáticamente.
+Los logs se escriben en `%PROGRAMDATA%` y rotan automáticamente al superar 5 MB.
 
-| Ambiente | Ruta Típica                                                |
+| Ambiente | Ruta Tipica                                                |
 |----------|------------------------------------------------------------|
 | **Prod** | `C:\ProgramData\TicketServicio\TicketServicio.log`         |
 | **Test** | `C:\ProgramData\TicketServicioTest\TicketServicioTest.log` |
+
+### Ver Logs
+
+```powershell
+# Ultimas 100 lineas
+task logs
+
+# O directamente:
+Get-Content "C:\ProgramData\TicketServicioTest\TicketServicioTest.log" -Tail 100 -Wait
+```
+
+---
+
+## 🔧 Solución de Problemas
+
+### El servicio no inicia
+
+```powershell
+# Verificar estado
+sc query TicketServicioTest
+
+# Ver logs de error
+task logs
+
+# Reinstalar
+task uninstall
+task install
+```
+
+### No se puede conectar por WebSocket
+
+1. Verificar que el servicio esté corriendo: `task status`
+2. Verificar firewall para puerto 8766
+3. Probar health check: `task health`
+
+### La impresora no imprime
+
+1. Verificar nombre exacto en `profile.model` (debe coincidir con Windows)
+2. Verificar que Print Spooler este activo:  `Get-Service Spooler`
+3. Probar impresión directa desde Windows
 
 ---
 
@@ -288,3 +348,4 @@ MIT © adcondev - RED 2000
 
 * [Poster Library](https://github.com/adcondev/poster) - Motor de impresión ESC/POS
 * [Especificación Documento v1.0](https://github.com/adcondev/poster/tree/master/api/v1)
+* [Task - Automatización](https://taskfile.dev/)

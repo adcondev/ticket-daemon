@@ -19,6 +19,7 @@ var (
 	logConfigMux sync.RWMutex
 	logFilePath  string
 	logFile      *os.File
+	logFileMu    sync.Mutex // Protege operaciones de archivo (write, flush, rotate)
 )
 
 // Non-critical prefixes (filtered when verbose=false)
@@ -32,11 +33,9 @@ var nonCriticalPrefixes = []string{
 }
 
 // FilteredLogger implements io.Writer with filtering
-type FilteredLogger struct {
-	file *os.File
-	mu   sync.Mutex
-}
+type FilteredLogger struct{}
 
+// Write filters log messages based on verbosity
 func (l *FilteredLogger) Write(p []byte) (n int, err error) {
 	logConfigMux.RLock()
 	verbose := logConfig.Verbose
@@ -51,13 +50,21 @@ func (l *FilteredLogger) Write(p []byte) (n int, err error) {
 		}
 	}
 
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	return l.file.Write(p)
+	// Usar mutex global
+	logFileMu.Lock()
+	defer logFileMu.Unlock()
+
+	if logFile == nil {
+		return 0, fmt.Errorf("log file not initialized")
+	}
+	return logFile.Write(p)
 }
 
 // InitLogger initializes the file logger with rotation
 func InitLogger(path string, verbose bool) error {
+	logFileMu.Lock()
+	defer logFileMu.Unlock()
+
 	logFilePath = path
 
 	// Set verbosity
@@ -78,7 +85,7 @@ func InitLogger(path string, verbose bool) error {
 	logFile = f
 
 	// Use filtered logger
-	log.SetOutput(&FilteredLogger{file: f})
+	log.SetOutput(&FilteredLogger{})
 	log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds)
 
 	return nil
@@ -89,7 +96,7 @@ func SetVerbose(v bool) {
 	logConfigMux.Lock()
 	logConfig.Verbose = v
 	logConfigMux.Unlock()
-	log.Printf("[OK] Verbosidad de logs:  %v", v)
+	log.Printf("[OK] Verbosidad de logs: %v", v)
 }
 
 // GetVerbose returns current verbosity level
@@ -113,6 +120,9 @@ func GetLogFileSize() int64 {
 
 // FlushLogFile keeps last 50 lines and clears the rest
 func FlushLogFile() error {
+	logFileMu.Lock()
+	defer logFileMu.Unlock()
+
 	if logFilePath == "" {
 		return fmt.Errorf("ruta de log no configurada")
 	}
@@ -123,7 +133,7 @@ func FlushLogFile() error {
 		content = strings.Join(lines, "\n") + "\n"
 	}
 
-	// Close, truncate, reopen
+	// ningún Write() puede ocurrir
 	if logFile != nil {
 		logFile.Close()
 	}
@@ -138,7 +148,7 @@ func FlushLogFile() error {
 	}
 
 	logFile = f
-	log.SetOutput(&FilteredLogger{file: f})
+	// FilteredLogger usa la variable global
 	log.Println("[OK] Logs limpiados")
 
 	return nil

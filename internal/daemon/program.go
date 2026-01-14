@@ -2,6 +2,7 @@ package daemon
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -31,12 +32,25 @@ const (
 	serviceNameTest = "TicketServicioTest"
 )
 
-// EnvironmentConfig holds environment-specific configuration
+// EnvironmentConfig holds ALL environment-specific configuration
 type EnvironmentConfig struct {
-	Name           string
-	ServiceName    string
-	ListenAddr     string
-	Verbose        bool
+	// Identificación
+	Name        string
+	ServiceName string
+
+	// Red
+	ListenAddr   string
+	ReadTimeout  time.Duration
+	WriteTimeout time.Duration
+	IdleTimeout  time.Duration
+
+	// Cola
+	QueueCapacity int
+
+	// Logging
+	Verbose bool
+
+	// Impresora
 	DefaultPrinter string
 }
 
@@ -45,6 +59,10 @@ var envConfigs = map[string]EnvironmentConfig{
 		Name:           "PRODUCCIÓN",
 		ServiceName:    serviceName,
 		ListenAddr:     "0.0.0.0:8766",
+		ReadTimeout:    15 * time.Second,
+		WriteTimeout:   15 * time.Second,
+		IdleTimeout:    60 * time.Second,
+		QueueCapacity:  100,
 		Verbose:        false,
 		DefaultPrinter: "",
 	},
@@ -52,8 +70,12 @@ var envConfigs = map[string]EnvironmentConfig{
 		Name:           "TEST/DEV",
 		ServiceName:    serviceNameTest,
 		ListenAddr:     "localhost:8766",
+		ReadTimeout:    30 * time.Second, // Más tiempo para debugging
+		WriteTimeout:   30 * time.Second,
+		IdleTimeout:    120 * time.Second,
+		QueueCapacity:  50, // Menor para detectar problemas rápido
 		Verbose:        true,
-		DefaultPrinter: "80mm EC-PM-80250",
+		DefaultPrinter: "58mm PT-210",
 	},
 }
 
@@ -96,11 +118,11 @@ func (p *Program) Init(env svc.Environment) error {
 func (p *Program) Start() error {
 	p.quit = make(chan struct{})
 	p.startTime = time.Now()
-	envConfig := GetEnvConfig()
+	cfg := GetEnvConfig()
 
 	// Initialize WebSocket server
 	p.wsServer = server.NewServer(server.Config{
-		QueueSize: 100,
+		QueueSize: cfg.QueueCapacity,
 	})
 
 	// Initialize print worker
@@ -108,7 +130,7 @@ func (p *Program) Start() error {
 		p.wsServer.JobQueue(),
 		p.wsServer,
 		worker.Config{
-			DefaultPrinter: envConfig.DefaultPrinter,
+			DefaultPrinter: cfg.DefaultPrinter,
 		},
 	)
 	p.printWorker.Start()
@@ -122,45 +144,35 @@ func (p *Program) Start() error {
 	// Enhanced health check endpoint with more metrics
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		current, capacity := p.wsServer.QueueStatus()
-		workerStats := p.printWorker.Stats()
-		uptime := time.Since(p.startTime)
+		stats := p.printWorker.Stats()
+
+		response := HealthResponse{
+			Status: "ok",
+			Queue: QueueStatus{
+				Current:     current,
+				Capacity:    capacity,
+				Utilization: float64(current) / float64(capacity) * 100,
+			},
+			Worker: WorkerStatus{
+				Running:       stats.IsRunning,
+				JobsProcessed: stats.JobsProcessed,
+				JobsFailed:    stats.JobsFailed,
+			},
+			Build: BuildInfo{
+				Env:  BuildEnvironment,
+				Date: BuildDate,
+				Time: BuildTime,
+			},
+			Uptime: int(time.Since(p.startTime).Seconds()),
+		}
 
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 
-		// Enhanced health response
-		response := fmt.Sprintf(`{
-  "status": "ok",
-  "queue": {
-    "current": %d,
-    "capacity": %d,
-    "utilization": %.1f
-  },
-  "worker": {
-    "running": %t,
-    "jobs_processed": %d,
-    "jobs_failed": %d
-  },
-  "build": {
-    "env": "%s",
-    "date": "%s",
-    "time": "%s"
-  },
-  "uptime_seconds": %d
-}`,
-			current,
-			capacity,
-			float64(current)/float64(capacity)*100,
-			workerStats.IsRunning,
-			workerStats.JobsProcessed,
-			workerStats.JobsFailed,
-			BuildEnvironment,
-			BuildDate,
-			BuildTime,
-			int(uptime.Seconds()),
-		)
-
-		fmt.Fprint(w, response)
+		// json.NewEncoder es más eficiente que Marshal + Write
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			http.Error(w, `{"error":"encoding failed"}`, http.StatusInternalServerError)
+		}
 	})
 
 	// Serve embedded web files
@@ -173,7 +185,7 @@ func (p *Program) Start() error {
 	}
 
 	p.httpServer = &http.Server{
-		Addr:         envConfig.ListenAddr,
+		Addr:         cfg.ListenAddr,
 		Handler:      mux,
 		ReadTimeout:  15 * time.Second,
 		WriteTimeout: 15 * time.Second,
@@ -185,10 +197,10 @@ func (p *Program) Start() error {
 		defer p.wg.Done()
 
 		log.Println("┌─────────────────────────────────────────────────────────────┐")
-		log.Printf("│ 🎫 TICKET DAEMON READY - Environment: %-22s│", envConfig.Name)
-		log.Printf("│ 🔌 WebSocket: ws://%s/ws%-25s│", envConfig.ListenAddr, "")
-		log.Printf("│ 🌐 Dashboard: http://%s%-27s│", envConfig.ListenAddr, "")
-		log.Printf("│ 💚 Health:     http://%s/health%-20s│", envConfig.ListenAddr, "")
+		log.Printf("│ 🎫 TICKET DAEMON READY - Environment: %-22s│", cfg.Name)
+		log.Printf("│ 🔌 WebSocket: ws://%s/ws%-25s│", cfg.ListenAddr, "")
+		log.Printf("│ 🌐 Dashboard: http://%s%-27s│", cfg.ListenAddr, "")
+		log.Printf("│ 💚 Health:     http://%s/health%-20s│", cfg.ListenAddr, "")
 		log.Println("└─────────────────────────────────────────────────────────────┘")
 
 		if err := p.httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {

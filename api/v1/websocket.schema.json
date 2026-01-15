@@ -1,0 +1,365 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/adcondev/ticket-daemon/api/v1/websocket.schema.json",
+  "title": "Ticket Daemon WebSocket Protocol",
+  "description": "Schema for WebSocket message protocol between clients and Ticket Daemon server",
+
+  "definitions": {
+    "MessageType": {
+      "type": "string",
+      "description": "Type of message in the WebSocket protocol",
+      "enum": ["ticket", "status", "ping", "info", "ack", "result", "error", "pong"]
+    },
+
+    "ClientMessage": {
+      "type": "object",
+      "description": "Messages sent from client to server",
+      "required": ["tipo"],
+      "properties":  {
+        "tipo": {
+          "type": "string",
+          "enum": ["ticket", "status", "ping"],
+          "description":  "Type of client request"
+        }
+      },
+      "oneOf": [
+        { "$ref": "#/definitions/TicketRequest" },
+        { "$ref": "#/definitions/StatusRequest" },
+        { "$ref": "#/definitions/PingRequest" }
+      ]
+    },
+
+    "TicketRequest": {
+      "type":  "object",
+      "description": "Request to queue a print job",
+      "required": ["tipo", "datos"],
+      "properties": {
+        "tipo": {
+          "const": "ticket"
+        },
+        "id": {
+          "type": "string",
+          "description":  "Optional client-provided job ID.  If omitted, server generates a UUID.",
+          "pattern":  "^[a-zA-Z0-9_-]{1,64}$",
+          "examples": ["pos1-20260115-001", "job-1736956800000"]
+        },
+        "datos": {
+          "$ref": "document.schema.json",
+          "description":  "Print document following the Poster document format v1.0"
+        }
+      },
+      "additionalProperties": false
+    },
+
+    "StatusRequest": {
+      "type": "object",
+      "description": "Request current queue status",
+      "required": ["tipo"],
+      "properties":  {
+        "tipo": {
+          "const": "status"
+        }
+      },
+      "additionalProperties": false
+    },
+
+    "PingRequest": {
+      "type":  "object",
+      "description": "Ping request to check server responsiveness",
+      "required": ["tipo"],
+      "properties":  {
+        "tipo": {
+          "const": "ping"
+        },
+        "id":  {
+          "type": "string",
+          "description": "Optional ID to correlate with pong response",
+          "examples": ["ping-1736956800000"]
+        }
+      },
+      "additionalProperties":  false
+    },
+
+    "ServerMessage": {
+      "type": "object",
+      "description":  "Messages sent from server to client",
+      "required":  ["tipo"],
+      "properties":  {
+        "tipo": {
+          "type": "string",
+          "enum":  ["info", "ack", "result", "error", "pong", "status"],
+          "description": "Type of server response"
+        }
+      },
+      "oneOf": [
+        { "$ref": "#/definitions/InfoResponse" },
+        { "$ref": "#/definitions/AckResponse" },
+        { "$ref": "#/definitions/ResultResponse" },
+        { "$ref": "#/definitions/ErrorResponse" },
+        { "$ref": "#/definitions/PongResponse" },
+        { "$ref": "#/definitions/StatusResponse" }
+      ]
+    },
+
+    "InfoResponse": {
+      "type": "object",
+      "description":  "Informational message from server (e.g., welcome message)",
+      "required": ["tipo", "status", "mensaje"],
+      "properties": {
+        "tipo": {
+          "const": "info"
+        },
+        "status": {
+          "type": "string",
+          "description": "Connection status",
+          "examples": ["connected"]
+        },
+        "mensaje": {
+          "type": "string",
+          "description": "Human-readable message",
+          "examples": ["Connected to Ticket Daemon print server"]
+        }
+      },
+      "additionalProperties": false
+    },
+
+    "AckResponse":  {
+      "type": "object",
+      "description": "Acknowledgment that a job was successfully queued",
+      "required": ["tipo", "id", "status"],
+      "properties": {
+        "tipo": {
+          "const": "ack"
+        },
+        "id":  {
+          "type": "string",
+          "description": "Job ID (client-provided or server-generated)"
+        },
+        "status": {
+          "const": "queued",
+          "description":  "Always 'queued' for ack responses"
+        },
+        "current":  {
+          "type": "integer",
+          "description": "Current number of jobs in queue",
+          "minimum":  0
+        },
+        "capacity": {
+          "type": "integer",
+          "description":  "Maximum queue capacity",
+          "minimum":  1
+        },
+        "mensaje": {
+          "type": "string",
+          "description":  "Human-readable confirmation",
+          "examples":  ["Job queued for printing"]
+        }
+      },
+      "additionalProperties":  false
+    },
+
+    "ResultResponse":  {
+      "type": "object",
+      "description": "Final result of a print job execution",
+      "required": ["tipo", "id", "status", "mensaje"],
+      "properties": {
+        "tipo": {
+          "const": "result"
+        },
+        "id": {
+          "type":  "string",
+          "description": "Job ID that was processed"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["success", "error"],
+          "description":  "Final execution status"
+        },
+        "mensaje":  {
+          "type": "string",
+          "description": "Result description or error details",
+          "examples": [
+            "Print completed in 245ms",
+            "VALIDATION:  Missing 'version' field",
+            "PRINTER: Cannot connect - check if printer is installed"
+          ]
+        }
+      },
+      "additionalProperties":  false
+    },
+
+    "ErrorResponse":  {
+      "type": "object",
+      "description": "Immediate error response (validation, queue full, etc.)",
+      "required":  ["tipo", "status", "mensaje"],
+      "properties": {
+        "tipo":  {
+          "const": "error"
+        },
+        "id": {
+          "type": "string",
+          "description":  "Job ID if applicable"
+        },
+        "status":  {
+          "const": "error"
+        },
+        "mensaje": {
+          "type": "string",
+          "description": "Error description",
+          "examples":  [
+            "Field 'datos' is required for type 'ticket'",
+            "Queue full, please retry in a few seconds",
+            "Unknown message type:  invalid"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+
+    "PongResponse": {
+      "type": "object",
+      "description": "Response to ping request",
+      "required": ["tipo", "status"],
+      "properties":  {
+        "tipo": {
+          "const": "pong"
+        },
+        "id": {
+          "type": "string",
+          "description":  "Echoed ID from ping request"
+        },
+        "status": {
+          "const": "ok"
+        }
+      },
+      "additionalProperties": false
+    },
+
+    "StatusResponse": {
+      "type": "object",
+      "description": "Current queue status",
+      "required": ["tipo", "status", "current", "capacity"],
+      "properties": {
+        "tipo":  {
+          "const": "status"
+        },
+        "status": {
+          "const": "ok"
+        },
+        "current": {
+          "type":  "integer",
+          "description": "Current number of jobs in queue",
+          "minimum": 0
+        },
+        "capacity": {
+          "type": "integer",
+          "description":  "Maximum queue capacity",
+          "minimum":  1
+        },
+        "mensaje":  {
+          "type": "string",
+          "description": "Formatted status string",
+          "examples": ["Queue:  5/100"]
+        }
+      },
+      "additionalProperties": false
+    },
+
+    "HealthResponse": {
+      "type": "object",
+      "description":  "Response from HTTP /health endpoint",
+      "required": ["status", "queue", "worker", "build", "uptime_seconds"],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": ["ok", "degraded", "error"],
+          "description": "Overall service health status"
+        },
+        "queue": {
+          "$ref": "#/definitions/QueueStatus"
+        },
+        "worker": {
+          "$ref": "#/definitions/WorkerStatus"
+        },
+        "build": {
+          "$ref": "#/definitions/BuildInfo"
+        },
+        "uptime_seconds": {
+          "type": "integer",
+          "description": "Service uptime in seconds",
+          "minimum":  0
+        }
+      },
+      "additionalProperties":  false
+    },
+
+    "QueueStatus": {
+      "type": "object",
+      "description":  "Job queue statistics",
+      "required": ["current", "capacity", "utilization"],
+      "properties": {
+        "current": {
+          "type": "integer",
+          "description": "Current jobs in queue",
+          "minimum": 0
+        },
+        "capacity": {
+          "type": "integer",
+          "description": "Maximum queue size",
+          "minimum": 1
+        },
+        "utilization": {
+          "type":  "number",
+          "description": "Queue utilization percentage (0-100)",
+          "minimum": 0,
+          "maximum":  100
+        }
+      }
+    },
+
+    "WorkerStatus":  {
+      "type": "object",
+      "description": "Print worker statistics",
+      "required": ["running", "jobs_processed", "jobs_failed"],
+      "properties":  {
+        "running": {
+          "type": "boolean",
+          "description": "Whether worker is actively processing"
+        },
+        "jobs_processed":  {
+          "type": "integer",
+          "description": "Total successful jobs since startup",
+          "minimum": 0
+        },
+        "jobs_failed": {
+          "type":  "integer",
+          "description": "Total failed jobs since startup",
+          "minimum":  0
+        }
+      }
+    },
+
+    "BuildInfo": {
+      "type": "object",
+      "description": "Build-time configuration",
+      "required": ["env", "date", "time"],
+      "properties":  {
+        "env": {
+          "type": "string",
+          "enum": ["prod", "test"],
+          "description":  "Build environment"
+        },
+        "date":  {
+          "type": "string",
+          "description": "Build date (YYYY-MM-DD)",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "time": {
+          "type":  "string",
+          "description": "Build time (HH: MM:SS)",
+          "pattern": "^\\d{2}:\\d{2}:\\d{2}$"
+        }
+      }
+    }
+  }
+}

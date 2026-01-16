@@ -439,7 +439,7 @@ header {
 
 .btn-group {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, 1fr);
   gap: 8px;
 }
 
@@ -555,6 +555,20 @@ select:focus {
   border-radius: 4px;
   font-family: 'Cascadia Code', 'Fira Code', monospace;
   font-size: 0.7rem;
+}
+
+.spin-anim {
+  animation: spin 1s linear infinite;
+  display: inline-block;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* ============================================================
@@ -722,6 +736,12 @@ select:focus {
   background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
   color: #fff;
   box-shadow: 0 2px 8px rgba(139, 92, 246, 0.3);
+}
+
+.log-badge.printers {
+  background: linear-gradient(135deg, #ec4899 0%, #db2777 100%); /* Vibrant Pink */
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(236, 72, 153, 0.3);
 }
 
 .log-message {

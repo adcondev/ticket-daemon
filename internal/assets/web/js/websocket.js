@@ -9,7 +9,7 @@ function connectWebSocket() {
   state.socket.onopen = () => {
     state.isConnected = true;
     updateConnectionUI(true);
-    addLog('INFO', '✅ Conectado al Ticket Daemon');
+      addLog('INFO', '✅ Cliente Conectado al Ticket Daemon');
     showToast('Conectado al servicio', 'success');
     fetchHealth();
   };
@@ -69,6 +69,21 @@ function handleMessage(msg) {
       const capacity = msg.capacity ?? 100;
       addLog('STATUS', `📊 Cola: ${current}/${capacity}`);
       updateQueueDisplay(current, capacity);
+        break;
+      case 'printers':
+          addLog('PRINTERS', `🖨️ Found ${msg.printers?.length || 0} printers`);
+
+          if (msg.printers) {
+              const thermal = msg.printers.filter(p => p.printer_type === 'thermal');
+              // Keep detailed lines as INFO to avoid visual noise, or change to PRINTERS if you prefer
+              addLog('PRINTERS', `   -> Thermal: ${thermal.length}, Virtual: ${msg.printers.length - thermal.length}`);
+
+              thermal.forEach(p => {
+                  const def = p.is_default ? '⭐' : '';
+                  // Using padStart for better alignment in logs
+                  addLog('PRINTERS', `      • ${p.name} [${p.port}] (${p.status})${def}`);
+              });
+          }
       break;
     default:
       addLog('INFO', JSON.stringify(msg));

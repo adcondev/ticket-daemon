@@ -70,17 +70,77 @@ const TEMPLATES = {
   },
   qr: {
     version: "1.0",
-    profile: {model: "58mm PT-210", paper_width: 58, has_qr: true},
+    profile: {
+      model: "58mm PT-210",
+      paper_width: 58,
+      code_table: "WPC1252",
+      dpi: 203,
+      has_qr: true
+    },
     commands: [
-      {type: "text", data: {content: {text: "PRUEBA CODIGO QR", align: "center", content_style: {bold: true}}}},
+      {
+        type: "text",
+        data: {
+          content: {text: "P", align: "center", content_style: {bold: true, size: "4x4"}}
+        }
+      },
+      {
+        type: "text",
+        data: {
+          content: {text: "CENTRO PLAZA", align: "center", content_style: {bold: true, size: "1x1"}}
+        }
+      },
+      {type: "text", data: {content: {text: "Av. Reforma 222, CDMX", align: "center"}}},
+      {type: "feed", data: {lines: 1}},
+      {type: "separator", data: {char: "-", length: 32}},
+      {
+        type: "table",
+        data: {
+          definition: {
+            columns: [
+              {name: "Concepto", width: 14, align: "left"},
+              {name: "Dato", width: 16, align: "right"}
+            ]
+          },
+          show_headers: false,
+          rows: [
+            ["Entrada:", "16/01 14:30"],
+            ["Placa:", "XK-99-22"],
+            ["Folio:", "#902102"]
+          ],
+          options: {column_spacing: 1}
+        }
+      },
+      {type: "separator", data: {char: "-", length: 32}},
       {type: "feed", data: {lines: 1}},
       {
         type: "qr",
         data: {
-          data: "https://github.com/adcondev/ticket-daemon",
-          human_text: "Escanear Docs",
-          pixel_width: 150,
-          align: "center"
+          data: "https://pagos.centroplaza.com/t/902102",
+          human_text: "ESCANEAR PARA PAGAR",
+          pixel_width: 240,
+          correction: "H",
+          align: "center",
+          logo: "PLACEHOLDER_IMAGEN_BASE64_LOGO_AQUI...",
+          circle_shape: false
+        }
+      },
+      {type: "feed", data: {lines: 1}},
+      {
+        type: "text",
+        data: {
+          content: {
+            text: "¡Evita filas! Paga desde tu celular escaneando el código QR.",
+            align: "center",
+            content_style: {size: "1x1"}
+          }
+        }
+      },
+      {type: "feed", data: {lines: 1}},
+      {
+        type: "text",
+        data: {
+          content: {text: "Horario: 24 hrs", align: "center", content_style: {bold: true}}
         }
       },
       {type: "feed", data: {lines: 3}},
@@ -89,26 +149,79 @@ const TEMPLATES = {
   },
   table: {
     version: "1.0",
-    profile: {model: "58mm PT-210", paper_width: 58},
+    profile: {
+      model: "58mm PT-210",
+      paper_width: 58,
+      code_table: "WPC1252",
+      dpi: 203
+    },
     commands: [
-      {type: "text", data: {content: {text: "PRUEBA DE TABLA", align: "center", content_style: {bold: true}}}},
+      {
+        type: "text",
+        data: {
+          content: {text: "== ORDEN DE COCINA ==", align: "center", content_style: {bold: true, size: "1x1"}}
+        }
+      },
       {type: "separator", data: {char: "=", length: 32}},
       {
         type: "table",
         data: {
           definition: {
-            columns: [{name: "ID", width: 4}, {name: "Prod", width: 14}, {
-              name: "Cant",
-              width: 4,
-              align: "right"
-            }]
+            columns: [
+              {name: "No.", width: 4, align: "left"},
+              {name: "ITEM", width: 18, align: "left"},
+              {name: "PRECIO", width: 8, align: "right"}
+            ]
           },
-          rows: [["01", "Pieza A", "5"], ["02", "Pieza B", "10"], ["03", "Pieza X", "3"]],
-          options: {header_bold: true, column_spacing: 1}
+          show_headers: true,
+          rows: [
+            ["001", "Pizza Fam 16\"", "$250.00"],
+            ["", " |_ Extra queso", "$30.00"],
+            ["", " |_ Doble carne", "$50.00"],
+            ["", " |_ Bebida 2L", "$25.00"],
+            ["", "-------", ""],
+            ["002", "Hamburguesa DX", "$120.00"],
+            ["", " |_ Con tocino", "$20.00"],
+            ["", " |_ Papas XL", "$35.00"],
+            ["", "-------", ""],
+            ["003", "Ensalada Caesar", "$85.00"],
+            ["", " |_ Sin crutones", "$0.00"]
+          ],
+          options: {header_bold: true, word_wrap: true, column_spacing: 1}
         }
       },
-      {type: "separator", data: {char: "=", length: 32}},
-      {type: "feed", data: {lines: 3}},
+      {type: "separator", data: {char: "-", length: 32}},
+      {
+        type: "table",
+        data: {
+          definition: {
+            columns: [
+              {name: "", width: 22, align: "left"},
+              {name: "", width: 8, align: "right"}
+            ]
+          },
+          show_headers: false,
+          rows: [
+            ["Subtotal:", "$615.00"],
+            ["IVA (16%):", "$98.40"],
+            ["TOTAL:", "$713.40"]
+          ],
+          options: {header_bold: false, column_spacing: 1}
+        }
+      },
+      {type: "feed", data: {lines: 1}},
+      {
+        type: "barcode",
+        data: {
+          symbology: "code128",
+          data: "2024011601",
+          width: 2,
+          height: 60,
+          hri_position: "below",
+          align: "center"
+        }
+      },
+      {type: "feed", data: {lines: 2}},
       {type: "cut", data: {mode: "partial"}}
     ]
   },
@@ -131,3 +244,10 @@ const TEMPLATES = {
     ]
   }
 };
+
+// Petición de lista de impresoras
+function requestPrinters() {
+  if (sendMessage({tipo: 'get_printers'})) {
+    addLog('SENT', '🖨️ Requesting printer list');
+  }
+}

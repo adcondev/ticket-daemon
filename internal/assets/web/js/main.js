@@ -106,10 +106,32 @@ function setupEventListeners() {
     }
   });
 
+  // Lista de Impresoras
+  document.getElementById('btnPrinters')?.addEventListener('click', () => {
+    requestPrinters();
+  });
+
   // Actualizar (Refresh)
-  document.getElementById('btnRefresh').addEventListener('click', () => {
-    fetchHealth();
-    showToast('Actualizado', 'info');
+  document.getElementById('btnRefresh').addEventListener('click', async function () {
+    const btn = this;
+
+    // 1. Add visual feedback (spinning icon)
+    btn.classList.add('spin-anim');
+    btn.disabled = true; // Prevent double-clicks
+
+    try {
+      // 2. Await the fetch
+      await fetchHealth();
+      showToast('Estado del sistema actualizado', 'success');
+    } catch (e) {
+      showToast('Error actualizando estado', 'error');
+    } finally {
+      // 3. Remove feedback
+      setTimeout(() => {
+        btn.classList.remove('spin-anim');
+        btn.disabled = false;
+      }, 500); // Minimum spin time for visual clarity
+    }
   });
 
   // Limpiar Logs

@@ -15,7 +15,7 @@ utiliza la librería **Poster** como motor de renderizado ESC/POS.
 
 - 🔌 **Servidor WebSocket** de alto rendimiento (puerto 8766 por defecto).
 - 🛡️ **Protección de Backpressure**: Cola con buffer (100 slots) y rechazo inmediato si se satura.
-- 🖨️ **Servicio Nativo Windows**:  Integración completa con SCM (Service Control Manager).
+- 🖨️ **Servicio Nativo Windows**: Integración completa con SCM (Service Control Manager).
 - 📝 **Logging Estructurado**: Rotación automática de archivos (5 MB) para mantenimiento cero.
 - 🖨️ **Motor Poster**: Soporte avanzado para texto, códigos de barras, QR e imágenes.
 
@@ -141,14 +141,16 @@ sequenceDiagram
 
 ### Tipos de Mensaje
 
-| Direccion | `tipo`   | Descripcion                 |
-|-----------|----------|-----------------------------|
-| C -> S    | `ticket` | Enviar trabajo de impresion |
-| C -> S    | `status` | Solicitar estado de la cola |
-| C -> S    | `ping`   | Ping al servidor            |
-| S -> C    | `ack`    | Trabajo aceptado y encolado |
-| S -> C    | `result` | Trabajo completado/fallido  |
-| S -> C    | `error`  | Error de validacion/cola    |
+| Direccion | `tipo`         | Descripcion                  |
+|-----------|----------------|------------------------------|
+| C -> S    | `ticket`       | Enviar trabajo de impresion  |
+| C -> S    | `status`       | Solicitar estado de la cola  |
+| C -> S    | `ping`         | Ping al servidor             |
+| C -> S    | `get_printers` | Listar impresoras instaladas |
+| S -> C    | `ack`          | Trabajo aceptado y encolado  |
+| S -> C    | `result`       | Trabajo completado/fallido   |
+| S -> C    | `error`        | Error de validacion/cola     |
+| S -> C    | `printers`     | Lista de impresoras          |
 
 ### Ejemplo de Payload
 
@@ -186,6 +188,71 @@ sequenceDiagram
   }
 }
 ```
+
+### Descubrimiento de Impresoras
+
+El servicio detecta automáticamente las impresoras instaladas en Windows al iniciar y expone esta información via
+WebSocket y HTTP.
+
+**Mensaje WebSocket:**
+
+Petición para obtener impresoras:
+
+```json
+{
+  "tipo": "get_printers"
+}
+```
+
+Respuesta del servidor:
+
+```json
+{
+  "tipo": "printers",
+  "status": "ok",
+  "printers": [
+    {
+      "name": "58mm PT-210",
+      "port": "USB001",
+      "driver": "Generic / Text Only",
+      "status": "ready",
+      "is_default": true,
+      "is_virtual": false,
+      "printer_type": "thermal"
+    }
+  ],
+  "summary": {
+    "status": "ok",
+    "detected_count": 5,
+    "thermal_count": 1,
+    "default_name": "58mm PT-210"
+  }
+}
+```
+
+**Health Check (`/health`):**
+
+```json
+{
+  "status": "ok",
+  "printers": {
+    "status": "ok",
+    "detected_count": 5,
+    "thermal_count": 1,
+    "default_name": "58mm PT-210"
+  }
+  // ... other fields
+}
+```
+
+| Estado Printers | Significado                                    |
+|-----------------|------------------------------------------------|
+| `ok`            | Al menos una impresora térmica detectada       |
+| `warning`       | Hay impresoras físicas pero ninguna es térmica |
+| `error`         | No hay impresoras físicas instaladas           |
+
+> **Nota:** El estado `ready` refleja el último estado conocido del Windows Spooler. Para impresoras USB/Serial, esto
+> puede no reflejar si están físicamente conectadas en tiempo real.
 
 ---
 
@@ -333,7 +400,7 @@ task install
 ### La impresora no imprime
 
 1. Verificar nombre exacto en `profile.model` (debe coincidir con Windows)
-2. Verificar que Print Spooler este activo:  `Get-Service Spooler`
+2. Verificar que Print Spooler este activo: `Get-Service Spooler`
 3. Probar impresión directa desde Windows
 
 ---

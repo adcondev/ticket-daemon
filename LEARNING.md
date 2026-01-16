@@ -111,6 +111,14 @@ programming, concurrent systems design, and Windows system integration.
 - **Implemented queue overflow protection** with immediate feedback to clients
 - **Built filtered logging system** that reduces verbosity in production mode
 
+### Windows System Integration
+
+- **Built a native Windows Service** using the `go-svc` library with proper lifecycle management (Init, Start, Stop)
+- **Implemented structured logging** to `%PROGRAMDATA%` with automatic log rotation (5MB threshold, keeps 1000 lines)
+- **Created build-time environment configuration** for production vs. test deployments
+- **Implemented printer discovery** using Windows `EnumPrinters` API via syscall, with automatic classification of
+  thermal vs. virtual printers
+
 ---
 
 ## 💡 Skills Gained/Reinforced
@@ -125,6 +133,8 @@ programming, concurrent systems design, and Windows system integration.
   prevent circular dependencies.
 - [x] **Go Embed** - Bundling static HTML/JS assets into the binary for a single-file distribution.
 - [x] **Context Management** - Using `context.WithTimeout` for controlling I/O deadlines during client notifications.
+- [x] **Windows API Integration** - Direct syscall to `winspool.drv` for `EnumPrinters`, `GetDefaultPrinter`
+- [x] **Caching Patterns** - Implemented thread-safe cache with TTL and double-check locking optimization
 
 ### Architecture & Design
 
@@ -167,3 +177,5 @@ programming, concurrent systems design, and Windows system integration.
   without a live WebSocket server.
 - Developed a **self-contained binary** using `embed`, bundling the diagnostic dashboard UI directly into the Windows
   Service executable.
+- Implemented **Windows printer discovery** using direct syscall to `EnumPrinters` API with intelligent classification
+  of thermal vs. virtual printers and 30-second caching for performance

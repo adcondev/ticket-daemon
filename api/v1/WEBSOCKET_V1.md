@@ -132,6 +132,22 @@ Envía un ping para verificar que el servidor responde.
 
 ---
 
+### 4. `get_printers` - Listar Impresoras
+
+Solicita la lista de impresoras instaladas en el sistema.
+
+**Estructura:**
+
+```json
+{
+  "tipo": "get_printers"
+}
+```
+
+| Campo  | Tipo   | Requerido | Descripción               |
+|--------|--------|-----------|---------------------------|
+| `tipo` | string | ✓         | Debe ser `"get_printers"` |
+
 ## Mensajes del Servidor → Cliente
 
 ### 1. `info` - Mensaje Informativo
@@ -285,6 +301,74 @@ Enviado cuando hay un error de validación o la cola está llena (antes de encol
 | `capacity` | integer | Capacidad máxima               |
 | `mensaje`  | string  | Estado formateado              |
 
+### 7. `printers` - Lista de Impresoras
+
+Respuesta con información detallada de las impresoras instaladas.
+
+```json
+{
+  "tipo": "printers",
+  "status": "ok",
+  "printers": [
+    {
+      "name": "58mm PT-210",
+      "port": "USB001",
+      "driver": "Generic / Text Only",
+      "status": "ready",
+      "is_default": true,
+      "is_virtual": false,
+      "printer_type": "thermal"
+    },
+    {
+      "name": "Microsoft Print to PDF",
+      "port": "PORTPROMPT:",
+      "driver": "Microsoft Print To PDF",
+      "status": "ready",
+      "is_default": false,
+      "is_virtual": true,
+      "printer_type": "virtual"
+    }
+  ],
+  "summary": {
+    "status": "ok",
+    "detected_count": 2,
+    "thermal_count": 1,
+    "default_name": "58mm PT-210"
+  }
+}
+```
+
+| Campo      | Tipo   | Descripción                          |
+|------------|--------|--------------------------------------|
+| `tipo`     | string | Siempre `"printers"`                 |
+| `status`   | string | Siempre `"ok"`                       |
+| `printers` | array  | Lista de objetos `PrinterDetail`     |
+| `summary`  | object | Resumen del subsistema de impresoras |
+
+**PrinterDetail:**
+
+| Campo          | Tipo    | Descripción                                               |
+|----------------|---------|-----------------------------------------------------------|
+| `name`         | string  | Nombre de la cola de impresión                            |
+| `port`         | string  | Puerto (USB001, LPT1, etc.)                               |
+| `driver`       | string  | Nombre del driver                                         |
+| `status`       | string  | Estado:  `ready`, `offline`, `paused`, `error`, `unknown` |
+| `is_default`   | boolean | Si es la impresora predeterminada                         |
+| `is_virtual`   | boolean | Si es virtual (PDF, XPS, etc.)                            |
+| `printer_type` | string  | Tipo:  `thermal`, `virtual`, `network`, `unknown`         |
+
+**PrinterSummary:**
+
+| Campo            | Tipo    | Descripción                                                           |
+|------------------|---------|-----------------------------------------------------------------------|
+| `status`         | string  | `ok` (térmica detectada), `warning` (solo físicas), `error` (ninguna) |
+| `detected_count` | integer | Total de impresoras instaladas                                        |
+| `thermal_count`  | integer | Impresoras térmicas/POS detectadas                                    |
+| `default_name`   | string  | Nombre de la impresora predeterminada (si existe)                     |
+
+> **Nota técnica:** El campo `status` de cada impresora refleja el último estado reportado por el Windows Spooler. Para
+> impresoras USB que no usan bidireccional, el estado puede no actualizarse hasta que se envíe un trabajo.
+
 ---
 
 ## HTTP Endpoints
@@ -358,54 +442,111 @@ Los mensajes de error en `result` siguen un formato prefijado para facilitar el 
 ### JavaScript (Browser)
 
 ```javascript
-const ws = new WebSocket('ws://localhost:8766/ws');
+/**
+ * Cliente Mínimo para Ticket Daemon
+ * Uso:
+ * const client = new TicketClient({
+ * host: 'localhost',
+ * onSuccess: (id, msg) => console.log('Éxito:', id),
+ * onError: (err) => console.error('Error:', err)
+ * });
+ * client.connect();
+ */
+class TicketClient {
+    constructor(config = {}) {
+        this.wsUrl = `ws://${config.host || 'localhost'}:8766/ws`;
+        this.socket = null;
+        this.callbacks = {
+            onConnect: config.onConnect || (() => console.log('🔌 Conectado a Ticket Daemon')),
+            onDisconnect: config.onDisconnect || (() => console.log('❌ Desconectado')),
+            onSuccess: config.onSuccess || ((id, msg) => console.log(`✅ Impreso [${id}]: ${msg}`)),
+            onError: config.onError || ((msg) => console.error(`⚠️ Error: ${msg}`)),
+            onPrinters: config.onPrinters || ((list) => console.table(list))
+        };
+    }
 
-ws.onopen = () => {
-  console.log('Conectado');
-};
+    connect() {
+        this.socket = new WebSocket(this.wsUrl);
 
-ws.onmessage = (event) => {
-  const msg = JSON.parse(event.data);
-  
-  switch (msg.tipo) {
-    case 'info':
-      console.log('Bienvenida:', msg.mensaje);
-      break;
-    case 'ack':
-      console.log(`Trabajo ${msg.id} encolado (${msg.current}/${msg.capacity})`);
-      break;
-    case 'result':
-      if (msg.status === 'success') {
-        console.log(`✅ ${msg.id}: ${msg.mensaje}`);
-      } else {
-        console.error(`❌ ${msg.id}: ${msg.mensaje}`);
-      }
-      break;
-    case 'error':
-      console.error('Error:', msg.mensaje);
-      break;
-  }
-};
+        this.socket.onopen = () => this.callbacks.onConnect();
 
-// Enviar trabajo de impresión
-function print(document) {
-  const message = {
-    tipo: 'ticket',
-    id: `job-${Date.now()}`,
-    datos: document
-  };
-  ws.send(JSON.stringify(message));
+        this.socket.onclose = () => {
+            this.callbacks.onDisconnect();
+            // Reintento automático cada 3 segundos
+            setTimeout(() => this.connect(), 3000);
+        };
+
+        this.socket.onmessage = (event) => {
+            const msg = JSON.parse(event.data);
+            this.handleMessage(msg);
+        };
+    }
+
+    handleMessage(msg) {
+        switch (msg.tipo) {
+            case 'result': // Resultado final de la impresión
+                if (msg.status === 'success') {
+                    this.callbacks.onSuccess(msg.id, msg.mensaje);
+                } else {
+                    this.callbacks.onError(`Fallo en trabajo ${msg.id}: ${msg.mensaje}`);
+                }
+                break;
+            case 'error': // Error inmediato (validación/cola)
+                this.callbacks.onError(msg.mensaje);
+                break;
+            case 'printers': // Respuesta de lista de impresoras
+                this.callbacks.onPrinters(msg.printers || []);
+                break;
+            case 'ack':
+                console.log(`📥 Encolado: ${msg.id} (Posición ${msg.current})`);
+                break;
+        }
+    }
+
+    /**
+     * Envía un documento a imprimir
+     * @param {Object} document - Objeto JSON con estructura de Poster (version, profile, commands)
+     * @param {string} [id] - ID opcional del trabajo
+     */
+    print(document, id = null) {
+        if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
+            this.callbacks.onError("No hay conexión con el servicio de impresión");
+            return;
+        }
+
+        const payload = {
+            tipo: 'ticket',
+            id: id || `job-${Date.now()}`,
+            datos: document
+        };
+
+        this.socket.send(JSON.stringify(payload));
+    }
+
+    /**
+     * Solicita la lista de impresoras instaladas
+     */
+    getPrinters() {
+        if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+            this.socket.send(JSON.stringify({tipo: 'get_printers'}));
+        }
+    }
 }
 
-// Ejemplo de documento
-print({
-  version: '1.0',
-  profile: { model: '58mm PT-210', paper_width: 58 },
-  commands: [
-    { type: 'text', data: { content: { text: 'Hola Mundo', align: 'center' } } },
-    { type: 'cut', data: { mode: 'partial' } }
-  ]
-});
+// EJEMPLO DE USO RÁPIDO:
+// ----------------------------------------
+// const printerService = new TicketClient();
+// printerService.connect();
+//
+// // Para imprimir:
+// printerService.print({
+//   version: "1.0",
+//   profile: { model: "58mm PT-210" },
+//   commands: [{ type: "text", data: { content: { text: "Hola Mundo" } } }]
+// });
+// 
+// // Para obtener impresoras:
+// printerService.getPrinters();
 ```
 
 ### Go

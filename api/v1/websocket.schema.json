@@ -8,7 +8,17 @@
     "MessageType": {
       "type": "string",
       "description": "Type of message in the WebSocket protocol",
-      "enum": ["ticket", "status", "ping", "info", "ack", "result", "error", "pong"]
+      "enum": [
+        "ticket",
+        "status",
+        "ping",
+        "info",
+        "ack",
+        "result",
+        "error",
+        "pong",
+        "printers"
+      ]
     },
 
     "ClientMessage": {
@@ -18,14 +28,24 @@
       "properties":  {
         "tipo": {
           "type": "string",
-          "enum": ["ticket", "status", "ping"],
+          "enum": [
+            "ticket",
+            "status",
+            "ping",
+            "get_printers"
+          ],
           "description":  "Type of client request"
         }
       },
       "oneOf": [
         { "$ref": "#/definitions/TicketRequest" },
         { "$ref": "#/definitions/StatusRequest" },
-        { "$ref": "#/definitions/PingRequest" }
+        {
+          "$ref": "#/definitions/PingRequest"
+        },
+        {
+          "$ref": "#/definitions/GetPrintersRequest"
+        }
       ]
     },
 
@@ -87,7 +107,15 @@
       "properties":  {
         "tipo": {
           "type": "string",
-          "enum":  ["info", "ack", "result", "error", "pong", "status"],
+          "enum": [
+            "info",
+            "ack",
+            "result",
+            "error",
+            "pong",
+            "status",
+            "printers"
+          ],
           "description": "Type of server response"
         }
       },
@@ -97,7 +125,12 @@
         { "$ref": "#/definitions/ResultResponse" },
         { "$ref": "#/definitions/ErrorResponse" },
         { "$ref": "#/definitions/PongResponse" },
-        { "$ref": "#/definitions/StatusResponse" }
+        {
+          "$ref": "#/definitions/StatusResponse"
+        },
+        {
+          "$ref": "#/definitions/PrintersResponse"
+        }
       ]
     },
 
@@ -267,8 +300,15 @@
 
     "HealthResponse": {
       "type": "object",
-      "description":  "Response from HTTP /health endpoint",
-      "required": ["status", "queue", "worker", "build", "uptime_seconds"],
+      "description": "Response from HTTP /health endpoint",
+      "required": [
+        "status",
+        "queue",
+        "worker",
+        "printers",
+        "build",
+        "uptime_seconds"
+      ],
       "properties": {
         "status": {
           "type": "string",
@@ -281,16 +321,19 @@
         "worker": {
           "$ref": "#/definitions/WorkerStatus"
         },
+        "printers": {
+          "$ref": "#/definitions/PrinterSummary"
+        },
         "build": {
           "$ref": "#/definitions/BuildInfo"
         },
         "uptime_seconds": {
           "type": "integer",
           "description": "Service uptime in seconds",
-          "minimum":  0
+          "minimum": 0
         }
       },
-      "additionalProperties":  false
+      "additionalProperties": false
     },
 
     "QueueStatus": {
@@ -358,6 +401,137 @@
           "type":  "string",
           "description": "Build time (HH: MM:SS)",
           "pattern": "^\\d{2}:\\d{2}:\\d{2}$"
+        }
+      }
+    },
+    "GetPrintersRequest": {
+      "type": "object",
+      "description": "Request to list installed printers",
+      "required": [
+        "tipo"
+      ],
+      "properties": {
+        "tipo": {
+          "const": "get_printers"
+        }
+      },
+      "additionalProperties": false
+    },
+    "PrintersResponse": {
+      "type": "object",
+      "description": "Response containing list of installed printers",
+      "required": [
+        "tipo",
+        "status",
+        "printers",
+        "summary"
+      ],
+      "properties": {
+        "tipo": {
+          "const": "printers"
+        },
+        "status": {
+          "const": "ok"
+        },
+        "printers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/PrinterDetail"
+          }
+        },
+        "summary": {
+          "$ref": "#/definitions/PrinterSummary"
+        }
+      },
+      "additionalProperties": false
+    },
+    "PrinterDetail": {
+      "type": "object",
+      "description": "Detailed information about an installed printer",
+      "required": [
+        "name",
+        "port",
+        "driver",
+        "status",
+        "is_default",
+        "is_virtual",
+        "printer_type"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Printer queue name as shown in Windows"
+        },
+        "port": {
+          "type": "string",
+          "description": "Port name (USB001, LPT1, etc.)"
+        },
+        "driver": {
+          "type": "string",
+          "description": "Driver name"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "ready",
+            "offline",
+            "paused",
+            "error",
+            "unknown"
+          ],
+          "description": "Last known printer status from Windows Spooler"
+        },
+        "is_default": {
+          "type": "boolean",
+          "description": "Whether this is the system default printer"
+        },
+        "is_virtual": {
+          "type": "boolean",
+          "description": "Whether this is a virtual/software printer (PDF, XPS, etc.)"
+        },
+        "printer_type": {
+          "type": "string",
+          "enum": [
+            "thermal",
+            "virtual",
+            "network",
+            "unknown"
+          ],
+          "description": "Detected printer category"
+        }
+      }
+    },
+    "PrinterSummary": {
+      "type": "object",
+      "description": "Summary of printer subsystem status",
+      "required": [
+        "status",
+        "detected_count",
+        "thermal_count"
+      ],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "ok",
+            "warning",
+            "error"
+          ],
+          "description": "Overall printer subsystem status"
+        },
+        "detected_count": {
+          "type": "integer",
+          "description": "Total number of installed printers",
+          "minimum": 0
+        },
+        "thermal_count": {
+          "type": "integer",
+          "description": "Number of detected thermal/POS printers",
+          "minimum": 0
+        },
+        "default_name": {
+          "type": "string",
+          "description": "Name of the default printer, if any"
         }
       }
     }

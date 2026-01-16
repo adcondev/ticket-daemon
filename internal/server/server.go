@@ -13,7 +13,15 @@ import (
 	"github.com/google/uuid"
 	"nhooyr.io/websocket"
 	"nhooyr.io/websocket/wsjson"
+
+	"github.com/adcondev/poster/pkg/connection"
+	"github.com/adcondev/ticket-daemon/internal/printer"
 )
+
+type PrinterLister interface {
+	GetPrinters(forceRefresh bool) ([]connection.PrinterDetail, error)
+	GetSummary() printer.Summary
+}
 
 // Config holds server configuration
 type Config struct {
@@ -47,24 +55,26 @@ type Response struct {
 
 // Server manages WebSocket connections and job queue
 type Server struct {
-	clients      *ClientRegistry
-	jobQueue     chan *PrintJob
-	queueSize    int
-	shutdownOnce sync.Once
-	shutdownChan chan struct{}
+	clients          *ClientRegistry
+	jobQueue         chan *PrintJob
+	queueSize        int
+	shutdownOnce     sync.Once
+	shutdownChan     chan struct{}
+	printerDiscovery PrinterLister
 }
 
 // NewServer creates a new WebSocket server
-func NewServer(cfg Config) *Server {
+func NewServer(cfg Config, discovery PrinterLister) *Server {
 	if cfg.QueueSize <= 0 {
 		cfg.QueueSize = 100
 	}
 
 	return &Server{
-		clients:      NewClientRegistry(),
-		jobQueue:     make(chan *PrintJob, cfg.QueueSize),
-		queueSize:    cfg.QueueSize,
-		shutdownChan: make(chan struct{}),
+		clients:          NewClientRegistry(),
+		jobQueue:         make(chan *PrintJob, cfg.QueueSize),
+		queueSize:        cfg.QueueSize,
+		shutdownChan:     make(chan struct{}),
+		printerDiscovery: discovery,
 	}
 }
 
@@ -99,7 +109,7 @@ func (s *Server) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	welcome := Response{
 		Tipo:    "info",
 		Status:  "connected",
-		Mensaje: "Connected to Ticket Daemon print server",
+		Mensaje: "✅ Servidor respondiendo desde Ticket Daemon",
 	}
 	_ = wsjson.Write(ctx, conn, welcome)
 
@@ -149,9 +159,11 @@ func (s *Server) routeMessage(ctx context.Context, conn *websocket.Conn, msg *Me
 		s.handleStatus(ctx, conn)
 	case "ping":
 		s.handlePing(ctx, conn, msg)
+	case "get_printers": // NEW
+		s.handleGetPrinters(ctx, conn)
 	default:
 		log.Printf("[WS] ⚠️ Unknown message type: %s", msg.Tipo)
-		s.sendError(ctx, conn, msg.ID, "Unknown message type: "+msg.Tipo)
+		s.sendError(ctx, conn, msg.ID, "Unknown message type:  "+msg.Tipo)
 	}
 }
 
@@ -226,6 +238,43 @@ func (s *Server) handlePing(ctx context.Context, conn *websocket.Conn, msg *Mess
 		ID:     msg.ID,
 		Status: "ok",
 	}
+	_ = wsjson.Write(ctx, conn, response)
+}
+
+// handleGetPrinters handles printer enumeration requests
+func (s *Server) handleGetPrinters(ctx context.Context, conn *websocket.Conn) {
+	printers, err := s.printerDiscovery.GetPrinters(false)
+	if err != nil {
+		s.sendError(ctx, conn, "", "Failed to enumerate printers: "+err.Error())
+		return
+	}
+
+	// Convert to DTOs
+	dtos := make([]printer.DetailDTO, len(printers))
+	for i, p := range printers {
+		dtos[i] = printer.DetailDTO{
+			Name:        p.Name,
+			Port:        p.Port,
+			Driver:      p.Driver,
+			Status:      string(p.Status),
+			IsDefault:   p.IsDefault,
+			IsVirtual:   p.IsVirtual,
+			PrinterType: p.PrinterType,
+		}
+	}
+
+	response := struct {
+		Tipo     string              `json:"tipo"`
+		Status   string              `json:"status"`
+		Printers []printer.DetailDTO `json:"printers"`
+		Summary  printer.Summary     `json:"summary"`
+	}{
+		Tipo:     "printers",
+		Status:   "ok",
+		Printers: dtos,
+		Summary:  s.printerDiscovery.GetSummary(),
+	}
+
 	_ = wsjson.Write(ctx, conn, response)
 }
 

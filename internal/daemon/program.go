@@ -89,12 +89,13 @@ func GetEnvConfig() EnvironmentConfig {
 
 // Program implements svc.Service interface
 type Program struct {
-	wg          sync.WaitGroup
-	quit        chan struct{}
-	httpServer  *http.Server
-	wsServer    *server.Server
-	printWorker *worker.Worker
-	startTime   time.Time
+	wg               sync.WaitGroup
+	quit             chan struct{}
+	httpServer       *http.Server
+	wsServer         *server.Server
+	printWorker      *worker.Worker
+	startTime        time.Time
+	printerDiscovery *PrinterDiscovery
 }
 
 // Init initializes the service
@@ -120,10 +121,11 @@ func (p *Program) Start() error {
 	p.startTime = time.Now()
 	cfg := GetEnvConfig()
 
+	p.printerDiscovery = NewPrinterDiscovery()
+	p.printerDiscovery.LogStartupDiagnostics()
+
 	// Initialize WebSocket server
-	p.wsServer = server.NewServer(server.Config{
-		QueueSize: cfg.QueueCapacity,
-	})
+	p.wsServer = server.NewServer(server.Config{QueueSize: cfg.QueueCapacity}, p.printerDiscovery)
 
 	// Initialize print worker
 	p.printWorker = worker.NewWorker(
@@ -158,6 +160,7 @@ func (p *Program) Start() error {
 				JobsProcessed: stats.JobsProcessed,
 				JobsFailed:    stats.JobsFailed,
 			},
+			Printers: p.printerDiscovery.GetSummary(), // NEW
 			Build: BuildInfo{
 				Env:  BuildEnvironment,
 				Date: BuildDate,
@@ -166,13 +169,14 @@ func (p *Program) Start() error {
 			Uptime: int(time.Since(p.startTime).Seconds()),
 		}
 
+		// NEW: Adjust overall status based on printer subsystem
+		if response.Printers.Status == "error" {
+			response.Status = "degraded"
+		}
+
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("Access-Control-Allow-Origin", "*")
-
-		// json.NewEncoder es más eficiente que Marshal + Write
-		if err := json.NewEncoder(w).Encode(response); err != nil {
-			http.Error(w, `{"error":"encoding failed"}`, http.StatusInternalServerError)
-		}
+		_ = json.NewEncoder(w).Encode(response)
 	})
 
 	// Serve embedded web files

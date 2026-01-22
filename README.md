@@ -273,9 +273,9 @@ Para modificar los valores predeterminados, edite `internal/daemon/program.go` a
 
 ### Prerrequisitos
 
-* **Go 1.24+**
-* **Task** (go-task) - [Instalación](https://taskfile.dev/installation/)
-* Windows 10/11 o Windows Server
+- **Go 1.24+**
+- **Task** (go-task) - [Instalación](https://taskfile.dev/installation/)
+- Windows 10/11 o Windows Server
 
 ### Comandos Comunes (con Task)
 
@@ -325,19 +325,35 @@ task build-console
 
 ```
 ticket-daemon/
+├── api/
+│   └── v1/
+│       ├── DOCUMENT_V1.md        # Especificacion formato documento
+│       ├── WEBSOCKET_V1.md       # Especificacion protocolo WebSocket
+│       ├── document.schema.json  # JSON Schema del documento
+│       └── websocket.schema.json # JSON Schema mensajes WS
+│
 ├── cmd/
 │   └── TicketServicio/
 │       └── ticket_servicio.go    # Punto de entrada (main)
 │
+├── examples/
+│   └── json/                     # Ejemplos de documentos JSON
+│       ├── showcase.json         # Demo de todos los comandos
+│       └── table_showcase.json   # Ejemplos de tablas
+│
 ├── internal/
 │   ├── assets/
 │   │   ├── embed.go              # Go embed para archivos web
-│   │   └── web/                  # Dashboard HTML/CSS/JS
+│   │   └── web/                  # Dashboard HTML/CSS/JS embebido
 │   │
 │   ├── daemon/
 │   │   ├── program.go            # Wrapper svc.Service y Configuracion
 │   │   ├── logger.go             # Logging filtrado con rotacion
-│   │   └── types.go              # Tipos de respuesta Health
+│   │   ├── daemon_types.go       # Tipos de respuesta Health
+│   │   └── printer_discovery.go  # Descubrimiento de impresoras Windows
+│   │
+│   ├── printer/
+│   │   └── printer_types.go      # Tipos compartidos de impresora
 │   │
 │   ├── server/
 │   │   ├── server.go             # Logica WebSocket y Cola (Select)
@@ -411,8 +427,28 @@ MIT © adcondev - RED 2000
 
 ---
 
+## 📖 Documentación de la API
+
+Este proyecto incluye documentación detallada del protocolo y formato de documentos:
+
+| Documento | Descripción |
+|-----------|-------------|
+| [DOCUMENT_V1.md](api/v1/DOCUMENT_V1.md) | Especificación del formato de documento de impresión |
+| [WEBSOCKET_V1.md](api/v1/WEBSOCKET_V1.md) | Especificación del protocolo WebSocket |
+| [document.schema.json](api/v1/document.schema.json) | JSON Schema para validación de documentos |
+| [websocket.schema.json](api/v1/websocket.schema.json) | JSON Schema para mensajes WebSocket |
+
+### Ejemplos de Uso
+
+La carpeta `examples/json/` contiene documentos de ejemplo listos para usar:
+
+- `showcase.json` - Demostración de todos los tipos de comandos
+- `table_showcase.json` - Ejemplos de tablas con diferentes configuraciones
+- `ticket_service_test.json` - Ticket completo con impuestos y QR
+
+---
+
 ## 🔗 Recursos Relacionados
 
-* [Poster Library](https://github.com/adcondev/poster) - Motor de impresión ESC/POS
-* [Especificación Documento v1.0](https://github.com/adcondev/poster/tree/master/api/v1)
-* [Task - Automatización](https://taskfile.dev/)
+- [Poster Library](https://github.com/adcondev/poster) - Motor de impresión ESC/POS
+- [Task - Automatización](https://taskfile.dev/)

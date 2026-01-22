@@ -85,6 +85,7 @@ programming, concurrent systems design, and Windows system integration.
 - **Built a native Windows Service** using the `go-svc` library with proper lifecycle management (Init, Start, Stop)
 - **Implemented structured logging** to `%PROGRAMDATA%` with automatic log rotation (5MB threshold, keeps 1000 lines)
 - **Created build-time environment configuration** for production vs. test deployments
+- **Implemented printer discovery** using Windows `EnumPrinters` API via syscall, with automatic classification of thermal vs. virtual printers
 
 ### Network Programming
 
@@ -98,26 +99,20 @@ programming, concurrent systems design, and Windows system integration.
 - **Defined a structured document schema** for print jobs with support for text, images, tables, barcodes, and QR codes
 - **Implemented printer profile system** supporting multiple thermal printer models (58mm, 80mm)
 - **Created dynamic document executor** that interprets JSON commands into ESC/POS byte sequences
+- **Authored comprehensive API documentation** (`api/v1/`) with Markdown specifications and JSON Schema validation
+- **Created practical example documents** demonstrating all command types for developer reference
 
 ### DevOps & Tooling
 
 - **Configured Taskfile.yml automation** for build, deploy, install, and service management operations
 - **Implemented multi-environment builds** (prod/test) with compile-time flag injection
-- **Created embedded HTML test client** for debugging and manual testing
+- **Created embedded HTML dashboard** for debugging, manual testing, and real-time printer status
 
 ### Error Handling & Resilience
 
 - **Designed comprehensive error propagation** from printer errors back to originating clients
 - **Implemented queue overflow protection** with immediate feedback to clients
 - **Built filtered logging system** that reduces verbosity in production mode
-
-### Windows System Integration
-
-- **Built a native Windows Service** using the `go-svc` library with proper lifecycle management (Init, Start, Stop)
-- **Implemented structured logging** to `%PROGRAMDATA%` with automatic log rotation (5MB threshold, keeps 1000 lines)
-- **Created build-time environment configuration** for production vs. test deployments
-- **Implemented printer discovery** using Windows `EnumPrinters` API via syscall, with automatic classification of
-  thermal vs. virtual printers
 
 ---
 

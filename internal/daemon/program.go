@@ -15,7 +15,7 @@ import (
 
 	"github.com/judwhite/go-svc"
 
-	"github.com/adcondev/ticket-daemon/internal/assets"
+	embed "github.com/adcondev/ticket-daemon"
 	"github.com/adcondev/ticket-daemon/internal/server"
 	"github.com/adcondev/ticket-daemon/internal/worker"
 )
@@ -180,7 +180,7 @@ func (p *Program) Start() error {
 	})
 
 	// Serve embedded web files
-	webFS, err := fs.Sub(assets.WebFiles, "web")
+	webFS, err := fs.Sub(embed.WebFiles, "internal/assets/web")
 	if err != nil {
 		log.Printf("[INIT] ⚠️ Error loading embedded web files: %v", err)
 	} else {

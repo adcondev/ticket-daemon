@@ -5,7 +5,9 @@ silent: true
 vars:
   SERVICE_NAME: TicketServicio
   SERVICE_TEST: TicketServicioTest
-  BINARY: R2k_TicketServicio.exe
+  SERVICE_REMOTE: TicketServicioRemote
+  BINARY: R2k_TicketServicio_Local.exe
+  BINARY_REMOTE: R2k_TicketServicio_Remote.exe
   BUILD_DIR: ./bin
   MODULE: github.com/adcondev/ticket-daemon/internal/daemon
 
@@ -22,10 +24,10 @@ tasks:
         echo ══════════════════════════════════════════════════════════
         echo  
         echo   QUICK START:
-        echo     task build        Build the service (test mode)
+        echo     task build        Build the service - test mode
         echo     task run          Build and run locally
         echo  
-        echo   SERVICE MANAGEMENT (Run as Administrator):
+        echo   SERVICE MANAGEMENT  Run as Administrator:
         echo     task install      Install as Windows Service
         echo     task uninstall    Remove Windows Service
         echo     task start        Start the service
@@ -61,8 +63,8 @@ tasks:
     desc: "Build service for production (0.0.0.0:8766)"
     cmds:
       - powershell -Command "if (!(Test-Path '{{.BUILD_DIR}}')) { New-Item -ItemType Directory -Path '{{.BUILD_DIR}}' -Force | Out-Null }"
-      - go build -ldflags "-s -w -X {{.MODULE}}.BuildEnvironment=prod -X {{.MODULE}}.BuildDate={{.DATE}} -X {{.MODULE}}.BuildTime={{.TIME}}" -o {{.BUILD_DIR}}/{{.BINARY}} ./cmd/TicketServicio
-      - powershell -Command "Write-Host '✅ Built {{.BUILD_DIR}}/{{.BINARY}} (PRODUCTION)'"
+      - go build -ldflags "-s -w -X {{.MODULE}}.BuildEnvironment=prod -X {{.MODULE}}.BuildDate={{.DATE}} -X {{.MODULE}}.BuildTime={{.TIME}}" -o {{.BUILD_DIR}}/{{.BINARY_REMOTE}} ./cmd/TicketServicio
+      - powershell -Command "Write-Host '✅ Built {{.BUILD_DIR}}/{{.BINARY_REMOTE}} (PRODUCTION)'"
     vars:
       DATE:
         sh: powershell -Command "Get-Date -Format 'yyyy-MM-dd'"
@@ -128,6 +130,24 @@ tasks:
       ABS_PATH:
         sh: powershell -Command "(Get-Location).Path"
 
+  install:remote:
+    desc: "Install as Windows Service (Remote) (requires Admin)"
+    deps: [ build-prod ]
+    cmds:
+      - cmd: sc stop {{.SERVICE_REMOTE}} 2>nul
+        ignore_error: true
+      - cmd: sc delete {{.SERVICE_REMOTE}} 2>nul
+        ignore_error: true
+      - sc create {{.SERVICE_REMOTE}} binPath= "{{.ABS_PATH}}\{{.BUILD_DIR}}\{{.BINARY_REMOTE}}" start= auto DisplayName= "Servicio de Tickets POS (Remoto)"
+      - sc description {{.SERVICE_REMOTE}} "Servicio de impresión de tickets POS via WebSocket"
+      - sc start {{.SERVICE_REMOTE}}
+      - echo
+      - echo ✅ Service installed and started!
+      - echo Production service listening on all interfaces
+    vars:
+      ABS_PATH:
+        sh: powershell -Command "(Get-Location).Path"
+
   uninstall:
     desc: "Remove Windows Service (requires Admin)"
     cmds:
@@ -135,6 +155,14 @@ tasks:
         ignore_error: true
       - sc delete {{.SERVICE_TEST}}
       - echo ✅ Service removed
+
+  uninstall:remote:
+    desc: "Remove Remote Windows Service (requires Admin)"
+    cmds:
+      - cmd: sc stop {{.SERVICE_REMOTE}} 2>nul
+        ignore_error: true
+      - sc delete {{.SERVICE_REMOTE}}
+      - echo ✅ Remote service removed
 
   start:
     desc: "Start the service"

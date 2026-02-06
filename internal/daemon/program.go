@@ -22,14 +22,14 @@ import (
 
 // Build variables, injected at compile time
 var (
-	BuildEnvironment = "prod"
+	BuildEnvironment = "local"
 	BuildDate        = "unknown"
 	BuildTime        = "unknown"
 )
 
 const (
-	serviceName     = "TicketServicio"
-	serviceNameTest = "TicketServicioTest"
+	serviceNameRemote = "R2k_TicketServicio_Remoto"
+	serviceNameLocal  = "R2k_TicketServicio_Local"
 )
 
 // EnvironmentConfig holds ALL environment-specific configuration
@@ -54,10 +54,12 @@ type EnvironmentConfig struct {
 	DefaultPrinter string
 }
 
+// TODO: El tipo de ambiente y puerto deberían llegar por ldflags en config.go
+
 var envConfigs = map[string]EnvironmentConfig{
-	"prod": {
-		Name:           "PRODUCCIÓN",
-		ServiceName:    serviceName,
+	"remote": {
+		Name:           "REMOTO",
+		ServiceName:    serviceNameRemote,
 		ListenAddr:     "0.0.0.0:8766",
 		ReadTimeout:    15 * time.Second,
 		WriteTimeout:   15 * time.Second,
@@ -66,9 +68,9 @@ var envConfigs = map[string]EnvironmentConfig{
 		Verbose:        false,
 		DefaultPrinter: "",
 	},
-	"test": {
-		Name:           "TEST/DEV",
-		ServiceName:    serviceNameTest,
+	"local": {
+		Name:           "LOCAL",
+		ServiceName:    serviceNameLocal,
 		ListenAddr:     "localhost:8766",
 		ReadTimeout:    30 * time.Second, // Más tiempo para debugging
 		WriteTimeout:   30 * time.Second,
@@ -84,7 +86,7 @@ func GetEnvConfig() EnvironmentConfig {
 	if config, ok := envConfigs[BuildEnvironment]; ok {
 		return config
 	}
-	return envConfigs["prod"]
+	return envConfigs["remote"]
 }
 
 // Program implements svc.Service interface

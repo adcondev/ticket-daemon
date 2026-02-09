@@ -73,19 +73,21 @@ func TestGetEnvironment_UnknownFallsBackToRemote(t *testing.T) {
 func TestGetEnvironment_LogNaming(t *testing.T) {
 	// Verify log path computation follows the convention:
 	// <programData>/<ServiceName>/<ServiceName>.log
+	const testProgramData = "/test/programdata"
+
 	tests := []struct {
 		env      string
 		wantPath string
 	}{
-		{"test", filepath.Join("C:\\ProgramData", "R2k_TicketServicio_Local", "R2k_TicketServicio_Local.log")},
-		{"prod", filepath.Join("C:\\ProgramData", "R2k_TicketServicio_Remoto", "R2k_TicketServicio_Remoto.log")},
-		{"local", filepath.Join("C:\\ProgramData", "R2k_TicketServicio_Local", "R2k_TicketServicio_Local.log")},
-		{"remote", filepath.Join("C:\\ProgramData", "R2k_TicketServicio_Remoto", "R2k_TicketServicio_Remoto.log")},
+		{"test", filepath.Join(testProgramData, "R2k_TicketServicio_Local", "R2k_TicketServicio_Local.log")},
+		{"prod", filepath.Join(testProgramData, "R2k_TicketServicio_Remoto", "R2k_TicketServicio_Remoto.log")},
+		{"local", filepath.Join(testProgramData, "R2k_TicketServicio_Local", "R2k_TicketServicio_Local.log")},
+		{"remote", filepath.Join(testProgramData, "R2k_TicketServicio_Remoto", "R2k_TicketServicio_Remoto.log")},
 	}
 	for _, tt := range tests {
 		t.Run(tt.env, func(t *testing.T) {
 			cfg := GetEnvironment(tt.env)
-			got := cfg.LogPath("C:\\ProgramData")
+			got := cfg.LogPath(testProgramData)
 			if got != tt.wantPath {
 				t.Errorf("LogPath for env %q = %q, want %q", tt.env, got, tt.wantPath)
 			}

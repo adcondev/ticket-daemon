@@ -23,7 +23,7 @@ import (
 
 // Build variables, injected at compile time
 var (
-	BuildEnvironment = "local"
+	BuildEnvironment = "test"
 	BuildDate        = "unknown"
 	BuildTime        = "unknown"
 )

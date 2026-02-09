@@ -137,9 +137,9 @@ func (p *Program) Start() error {
 	p.httpServer = &http.Server{
 		Addr:         cfg.ListenAddr,
 		Handler:      mux,
-		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 15 * time.Second,
-		IdleTimeout:  60 * time.Second,
+		ReadTimeout:  cfg.ReadTimeout,
+		WriteTimeout: cfg.WriteTimeout,
+		IdleTimeout:  cfg.IdleTimeout,
 	}
 
 	p.wg.Add(1)
@@ -191,8 +191,8 @@ func (p *Program) Stop() error {
 }
 
 func initLogging(envConfig config.Environment) error {
-	logDir := filepath.Join(os.Getenv("PROGRAMDATA"), envConfig.ServiceName)
-	logPath := filepath.Join(logDir, envConfig.ServiceName+".log")
+	logPath := envConfig.LogPath(os.Getenv("PROGRAMDATA"))
+	logDir := filepath.Dir(logPath)
 
 	if err := os.MkdirAll(logDir, 0755); err != nil {
 		return err

@@ -1,6 +1,7 @@
 package config
 
 import (
+	"path/filepath"
 	"testing"
 	"time"
 )
@@ -70,24 +71,23 @@ func TestGetEnvironment_UnknownFallsBackToRemote(t *testing.T) {
 }
 
 func TestGetEnvironment_LogNaming(t *testing.T) {
-	// Verify naming convention: R2k_<<Daemon>><<Type>>_<<Env>>
+	// Verify log path computation follows the convention:
+	// <programData>/<ServiceName>/<ServiceName>.log
 	tests := []struct {
-		env         string
-		wantService string
+		env      string
+		wantPath string
 	}{
-		{"test", "R2k_TicketServicio_Local"},
-		{"prod", "R2k_TicketServicio_Remoto"},
-		{"local", "R2k_TicketServicio_Local"},
-		{"remote", "R2k_TicketServicio_Remoto"},
+		{"test", filepath.Join("C:\\ProgramData", "R2k_TicketServicio_Local", "R2k_TicketServicio_Local.log")},
+		{"prod", filepath.Join("C:\\ProgramData", "R2k_TicketServicio_Remoto", "R2k_TicketServicio_Remoto.log")},
+		{"local", filepath.Join("C:\\ProgramData", "R2k_TicketServicio_Local", "R2k_TicketServicio_Local.log")},
+		{"remote", filepath.Join("C:\\ProgramData", "R2k_TicketServicio_Remoto", "R2k_TicketServicio_Remoto.log")},
 	}
 	for _, tt := range tests {
 		t.Run(tt.env, func(t *testing.T) {
 			cfg := GetEnvironment(tt.env)
-			// The log file should be named ServiceName + ".log"
-			expectedLog := cfg.ServiceName + ".log"
-			wantLog := tt.wantService + ".log"
-			if expectedLog != wantLog {
-				t.Errorf("Log name for env %q = %q, want %q", tt.env, expectedLog, wantLog)
+			got := cfg.LogPath("C:\\ProgramData")
+			if got != tt.wantPath {
+				t.Errorf("LogPath for env %q = %q, want %q", tt.env, got, tt.wantPath)
 			}
 		})
 	}

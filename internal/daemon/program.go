@@ -21,16 +21,9 @@ import (
 	"github.com/adcondev/ticket-daemon/internal/worker"
 )
 
-// Build variables, injected at compile time
-var (
-	BuildEnvironment = "local"
-	BuildDate        = "unknown"
-	BuildTime        = "unknown"
-)
-
 // GetEnvConfig returns the current environment configuration
 func GetEnvConfig() config.Environment {
-	return config.GetEnvironment(BuildEnvironment)
+	return config.GetEnvironment(config.BuildEnvironment)
 }
 
 // Program implements svc.Service interface
@@ -45,7 +38,7 @@ type Program struct {
 }
 
 // Init initializes the service
-func (p *Program) Init(env svc.Environment) error {
+func (p *Program) Init(_ svc.Environment) error {
 	envConfig := GetEnvConfig()
 
 	if err := initLogging(envConfig); err != nil {
@@ -56,7 +49,7 @@ func (p *Program) Init(env svc.Environment) error {
 	log.Println("║   🎫 TICKET DAEMON - POS Print Service                     ║")
 	log.Println("╚════════════════════════════════════════════════════════════╝")
 	log.Printf("[INIT] 🚀 Starting service - Environment: %s", envConfig.Name)
-	log.Printf("[INIT] 📅 Build: %s %s", BuildDate, BuildTime)
+	log.Printf("[INIT] 📅 Build: %s %s", config.BuildDate, config.BuildTime)
 
 	return nil
 }
@@ -92,6 +85,9 @@ func (p *Program) Start() error {
 	// Enhanced health check endpoint with more metrics
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		current, capacity := p.wsServer.QueueStatus()
+		if capacity == 0 {
+			current = 0 // Avoid division by zero
+		}
 		stats := p.printWorker.Stats()
 
 		response := HealthResponse{
@@ -108,9 +104,9 @@ func (p *Program) Start() error {
 			},
 			Printers: p.printerDiscovery.GetSummary(), // NEW
 			Build: BuildInfo{
-				Env:  BuildEnvironment,
-				Date: BuildDate,
-				Time: BuildTime,
+				Env:  config.BuildEnvironment,
+				Date: config.BuildDate,
+				Time: config.BuildTime,
 			},
 			Uptime: int(time.Since(p.startTime).Seconds()),
 		}

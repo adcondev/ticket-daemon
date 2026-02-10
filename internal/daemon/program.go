@@ -16,75 +16,21 @@ import (
 	"github.com/judwhite/go-svc"
 
 	embed "github.com/adcondev/ticket-daemon"
+	"github.com/adcondev/ticket-daemon/internal/config"
 	"github.com/adcondev/ticket-daemon/internal/server"
 	"github.com/adcondev/ticket-daemon/internal/worker"
 )
 
 // Build variables, injected at compile time
 var (
-	BuildEnvironment = "prod"
+	BuildEnvironment = "local"
 	BuildDate        = "unknown"
 	BuildTime        = "unknown"
 )
 
-const (
-	serviceName     = "TicketServicio"
-	serviceNameTest = "TicketServicioTest"
-)
-
-// EnvironmentConfig holds ALL environment-specific configuration
-type EnvironmentConfig struct {
-	// Identificación
-	Name        string
-	ServiceName string
-
-	// Red
-	ListenAddr   string
-	ReadTimeout  time.Duration
-	WriteTimeout time.Duration
-	IdleTimeout  time.Duration
-
-	// Cola
-	QueueCapacity int
-
-	// Logging
-	Verbose bool
-
-	// Impresora
-	DefaultPrinter string
-}
-
-var envConfigs = map[string]EnvironmentConfig{
-	"prod": {
-		Name:           "PRODUCCIÓN",
-		ServiceName:    serviceName,
-		ListenAddr:     "0.0.0.0:8766",
-		ReadTimeout:    15 * time.Second,
-		WriteTimeout:   15 * time.Second,
-		IdleTimeout:    60 * time.Second,
-		QueueCapacity:  100,
-		Verbose:        false,
-		DefaultPrinter: "",
-	},
-	"test": {
-		Name:           "TEST/DEV",
-		ServiceName:    serviceNameTest,
-		ListenAddr:     "localhost:8766",
-		ReadTimeout:    30 * time.Second, // Más tiempo para debugging
-		WriteTimeout:   30 * time.Second,
-		IdleTimeout:    120 * time.Second,
-		QueueCapacity:  50, // Menor para detectar problemas rápido
-		Verbose:        true,
-		DefaultPrinter: "58mm PT-210",
-	},
-}
-
 // GetEnvConfig returns the current environment configuration
-func GetEnvConfig() EnvironmentConfig {
-	if config, ok := envConfigs[BuildEnvironment]; ok {
-		return config
-	}
-	return envConfigs["prod"]
+func GetEnvConfig() config.Environment {
+	return config.GetEnvironment(BuildEnvironment)
 }
 
 // Program implements svc.Service interface
@@ -191,9 +137,9 @@ func (p *Program) Start() error {
 	p.httpServer = &http.Server{
 		Addr:         cfg.ListenAddr,
 		Handler:      mux,
-		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 15 * time.Second,
-		IdleTimeout:  60 * time.Second,
+		ReadTimeout:  cfg.ReadTimeout,
+		WriteTimeout: cfg.WriteTimeout,
+		IdleTimeout:  cfg.IdleTimeout,
 	}
 
 	p.wg.Add(1)
@@ -244,9 +190,9 @@ func (p *Program) Stop() error {
 	return nil
 }
 
-func initLogging(envConfig EnvironmentConfig) error {
-	logDir := filepath.Join(os.Getenv("PROGRAMDATA"), envConfig.ServiceName)
-	logPath := filepath.Join(logDir, envConfig.ServiceName+".log")
+func initLogging(envConfig config.Environment) error {
+	logPath := envConfig.LogPath(os.Getenv("PROGRAMDATA"))
+	logDir := filepath.Dir(logPath)
 
 	if err := os.MkdirAll(logDir, 0755); err != nil {
 		return err

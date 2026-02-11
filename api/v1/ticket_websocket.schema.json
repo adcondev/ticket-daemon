@@ -64,7 +64,7 @@
           "examples": ["pos1-20260115-001", "job-1736956800000"]
         },
         "datos": {
-          "$ref": "document.schema.json",
+          "$ref": "ticket_document.schema.json",
           "description":  "Print document following the Poster document format v1.0"
         }
       },

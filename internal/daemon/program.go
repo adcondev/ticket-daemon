@@ -90,12 +90,19 @@ func (p *Program) Start() error {
 		}
 		stats := p.printWorker.Stats()
 
+		var utilization float64
+		if capacity == 0 {
+			utilization = 0
+		} else {
+			utilization = float64(current) / float64(capacity) * 100
+		}
+
 		response := HealthResponse{
 			Status: "ok",
 			Queue: QueueStatus{
 				Current:     current,
 				Capacity:    capacity,
-				Utilization: float64(current) / float64(capacity) * 100,
+				Utilization: utilization,
 			},
 			Worker: WorkerStatus{
 				Running:       stats.IsRunning,

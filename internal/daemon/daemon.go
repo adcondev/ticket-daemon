@@ -83,7 +83,7 @@ func (p *Program) Start() error {
 	mux.HandleFunc("/ws", p.wsServer.HandleWebSocket)
 
 	// Enhanced health check endpoint with more metrics
-	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/health", func(w http.ResponseWriter, _ *http.Request) {
 		current, capacity := p.wsServer.QueueStatus()
 		if capacity == 0 {
 			current = 0 // Avoid division by zero
@@ -197,7 +197,7 @@ func initLogging(envConfig config.Environment) error {
 	logPath := envConfig.LogPath(os.Getenv("PROGRAMDATA"))
 	logDir := filepath.Dir(logPath)
 
-	if err := os.MkdirAll(logDir, 0755); err != nil {
+	if err := os.MkdirAll(logDir, 0750); err != nil {
 		return err
 	}
 

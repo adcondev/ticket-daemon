@@ -58,7 +58,13 @@ function handleMessage(msg) {
       fetchHealth();
       break;
     case 'error': // Error inmediato (validación, cola llena)
-      addLog('ERROR', `❌ ${msg.mensaje}`);
+      if (msg.mensaje && msg.mensaje.includes('Authentication failed')) {
+        addLog('ERROR', '🔒 ' + msg.mensaje, 'error');
+      } else if (msg.mensaje && msg.mensaje.includes('Rate limited')) {
+        addLog('ERROR', '⏳ ' + msg.mensaje, 'error');
+      } else {
+        addLog('ERROR', '❌ ' + msg.mensaje);
+      }
       showToast(msg.mensaje, 'error');
       break;
     case 'pong':
@@ -98,4 +104,10 @@ function sendMessage(msg) {
   }
   state.socket.send(JSON.stringify(msg));
   return true;
+}
+
+// Read the auth token injected by the server into the HTML template
+function getAuthToken() {
+  const meta = document.querySelector('meta[name="ws-auth-token"]');
+  return meta ? meta.content : '';
 }

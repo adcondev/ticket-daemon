@@ -1,8 +1,8 @@
+// Package embedded contiene los archivos estáticos del sitio web, embebidos en el binario de Go utilizando la directiva `embed`.
 package embedded
 
 import (
 	"embed"
-	_ "embed"
 )
 
 // WebFiles contiene el sitio web estático (HTML, CSS, JS)

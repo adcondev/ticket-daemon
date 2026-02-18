@@ -78,7 +78,7 @@ func InitLogger(path string, verbose bool) error {
 	}
 
 	// Open log file
-	f, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	f, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0600) //nolint:gosec
 	if err != nil {
 		return err
 	}
@@ -135,14 +135,17 @@ func FlushLogFile() error {
 
 	// ningún Write() puede ocurrir
 	if logFile != nil {
-		logFile.Close()
+		err := logFile.Close()
+		if err != nil {
+			return err
+		}
 	}
 
-	if err := os.WriteFile(logFilePath, []byte(content), 0666); err != nil {
+	if err := os.WriteFile(logFilePath, []byte(content), 0600); err != nil {
 		return err
 	}
 
-	f, err := os.OpenFile(logFilePath, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	f, err := os.OpenFile(logFilePath, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0600) //nolint:gosec
 	if err != nil {
 		return err
 	}
@@ -175,16 +178,21 @@ func rotateLogIfNeeded(path string) error {
 	}
 
 	content := strings.Join(lines, "\n") + "\n"
-	return os.WriteFile(path, []byte(content), 0666)
+	return os.WriteFile(path, []byte(content), 0600)
 }
 
 // readLastNLines reads last N lines from file
 func readLastNLines(path string, n int) []string {
-	file, err := os.Open(path)
+	file, err := os.Open(path) //nolint:gosec
 	if err != nil {
 		return []string{}
 	}
-	defer file.Close()
+	defer func(file *os.File) {
+		err := file.Close()
+		if err != nil {
+			log.Panicf("[!] Error cerrando archivo de log: %v", err)
+		}
+	}(file)
 
 	stat, err := file.Stat()
 	if err != nil {

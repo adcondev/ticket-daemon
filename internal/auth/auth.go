@@ -17,11 +17,16 @@ import (
 )
 
 const (
+	// SessionCookieName is the name of the cookie used to store the session token.
 	SessionCookieName = "td_session"
-	SessionDuration   = 15 * time.Minute
-	MaxLoginAttempts  = 5
-	LockoutDuration   = 5 * time.Minute
-	CleanupInterval   = 5 * time.Minute
+	// SessionDuration defines how long a session is valid before expiring.
+	SessionDuration = 15 * time.Minute
+	// MaxLoginAttempts is the number of failed login attempts before locking out an IP.
+	MaxLoginAttempts = 5
+	// LockoutDuration is the duration after which failed login records are cleaned up.
+	LockoutDuration = 5 * time.Minute
+	// CleanupInterval defines how often to run cleanup of expired sessions and failed login records.
+	CleanupInterval = 5 * time.Minute
 )
 
 type failInfo struct {

@@ -1,4 +1,4 @@
-// Package types contains shared types to avoid import cycles.
+// Package printer contains shared types to avoid import cycles.
 package printer
 
 // Summary PrinterSummary provides lightweight overview for health checks

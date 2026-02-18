@@ -19,7 +19,8 @@ tasks:
         go build -ldflags "-s -w
         -X '{{.CONFIG_PKG}}.AuthToken={{.TICKET_AUTH_TOKEN}}'
         -X '{{.CONFIG_PKG}}.PasswordHashB64={{.TICKET_DASHBOARD_HASH}}'
-        -X '{{.CONFIG_PKG}}.BuildEnvironment={{.BUILD_ENV}}'"
+        -X '{{.CONFIG_PKG}}.BuildEnvironment={{.BUILD_ENV}}'
+        -X '{{.CONFIG_PKG}}.ServiceName=R2k_TicketServicio'"
         -o bin/{{.BINARY_NAME}} ./cmd/TicketServicio
       - echo "✅ Compilación exitosa en bin/{{.BINARY_NAME}}"
 
@@ -28,3 +29,12 @@ tasks:
     deps: [ build ]
     cmds:
       - ./bin/{{.BINARY_NAME}} -console
+
+  clean:
+    desc: Limpia los artefactos de compilación
+    cmds:
+      - cmd: rm -rf bin/
+        platforms: [ linux, darwin ]
+      - cmd: powershell -Command "Remove-Item -Recurse -Force bin/"
+        platforms: [ windows ]
+      - echo "🧹 Limpieza completada"

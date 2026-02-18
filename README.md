@@ -1,5 +1,10 @@
 # 🎫 Ticket Daemon
 
+# Ticket Service Daemon
+
+[![codecov](https://codecov.io/gh/adcondev/ticket-daemon/branch/main/graph/badge.svg)](https://codecov.io/gh/adcondev/ticket-daemon)
+[![CI](https://github.com/adcondev/ticket-daemon/actions/workflows/ci.yml/badge.svg)](https://github.com/adcondev/ticket-daemon/actions/workflows/ci.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/adcondev/ticket-daemon)](https://goreportcard.com/report/github.com/adcondev/ticket-daemon)
 ![Language](https://img.shields.io/badge/Go-1.24+-00ADD8?style=flat&logo=go&logoColor=white)
 ![Platform](https://img.shields.io/badge/Platform-Windows-0078D6?style=flat&logo=windows&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-green?style=flat)

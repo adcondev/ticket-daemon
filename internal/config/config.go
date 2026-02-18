@@ -1,6 +1,8 @@
+// Package config defines environment-specific settings for the R2k Ticket Servicio.
 package config
 
 import (
+	"log"
 	"path/filepath"
 	"time"
 )
@@ -10,6 +12,16 @@ var (
 	BuildEnvironment = "local"
 	BuildDate        = "unknown"
 	BuildTime        = "unknown"
+	// ServiceName is used for logging and as part of the log file path.
+	ServiceName = "R2k_TicketServicio_Unknown"
+	// PasswordHashB64 is a base64-encoded bcrypt hash injected via ldflags.
+	// If empty, dashboard authentication is disabled (dev mode).
+	PasswordHashB64 = ""
+	// AuthToken is injected via ldflags.
+	// If empty, print job submissions are accepted without token validation.
+	AuthToken = ""
+	// ServerPort is the default port for the service, can be overridden by environment config.
+	ServerPort = "8766"
 )
 
 // Environment holds environment-specific settings
@@ -44,23 +56,23 @@ func (e Environment) LogPath(programData string) string {
 var environments = map[string]Environment{
 	"remote": {
 		Name:           "REMOTO",
-		ServiceName:    "R2k_TicketServicio_Remote",
-		ListenAddr:     "0.0.0.0:8766",
+		ServiceName:    ServiceName,
+		ListenAddr:     "0.0.0.0:" + ServerPort,
 		ReadTimeout:    15 * time.Second,
 		WriteTimeout:   15 * time.Second,
 		IdleTimeout:    60 * time.Second,
-		QueueCapacity:  100,
+		QueueCapacity:  50,
 		Verbose:        false,
 		DefaultPrinter: "",
 	},
 	"local": {
 		Name:           "LOCAL",
-		ServiceName:    "R2k_TicketServicio_Local",
-		ListenAddr:     "localhost:8766",
-		ReadTimeout:    30 * time.Second, // Más tiempo para debugging
+		ServiceName:    ServiceName,
+		ListenAddr:     "localhost:" + ServerPort,
+		ReadTimeout:    30 * time.Second,
 		WriteTimeout:   30 * time.Second,
 		IdleTimeout:    120 * time.Second,
-		QueueCapacity:  50, // Menor para detectar problemas rápido
+		QueueCapacity:  50,
 		Verbose:        true,
 		DefaultPrinter: "58mm PT-210",
 	},
@@ -71,5 +83,6 @@ func GetEnvironment(env string) Environment {
 	if cfg, ok := environments[env]; ok {
 		return cfg
 	}
-	return environments["remote"]
+	log.Printf("[!] Unknown environment '%s', defaulting to 'local'", env)
+	return environments["local"]
 }

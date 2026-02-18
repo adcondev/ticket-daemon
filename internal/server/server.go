@@ -4,20 +4,25 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"strconv"
 	"sync"
 	"time"
 
+	"github.com/coder/websocket"
+	"github.com/coder/websocket/wsjson"
 	"github.com/google/uuid"
-	"nhooyr.io/websocket"
-	"nhooyr.io/websocket/wsjson"
 
 	"github.com/adcondev/poster/pkg/connection"
+	"github.com/adcondev/ticket-daemon/internal/config"
 	"github.com/adcondev/ticket-daemon/internal/printer"
 )
 
+const maxJobsPerMinute = 30
+
+// PrinterLister defines an interface for printer discovery and summary retrieval
 type PrinterLister interface {
 	GetPrinters(forceRefresh bool) ([]connection.PrinterDetail, error)
 	GetSummary() printer.Summary
@@ -38,9 +43,10 @@ type PrintJob struct {
 
 // Message represents incoming WebSocket message
 type Message struct {
-	Tipo  string          `json:"tipo"`
-	ID    string          `json:"id,omitempty"`
-	Datos json.RawMessage `json:"datos,omitempty"`
+	Tipo      string          `json:"tipo"`
+	ID        string          `json:"id,omitempty"`
+	Datos     json.RawMessage `json:"datos,omitempty"`
+	AuthToken string          `json:"auth_token,omitempty"`
 }
 
 // Response represents outgoing WebSocket message
@@ -61,6 +67,7 @@ type Server struct {
 	shutdownOnce     sync.Once
 	shutdownChan     chan struct{}
 	printerDiscovery PrinterLister
+	jobLimiter       *JobRateLimiter
 }
 
 // NewServer creates a new WebSocket server
@@ -75,6 +82,7 @@ func NewServer(cfg Config, discovery PrinterLister) *Server {
 		queueSize:        cfg.QueueSize,
 		shutdownChan:     make(chan struct{}),
 		printerDiscovery: discovery,
+		jobLimiter:       NewJobRateLimiter(maxJobsPerMinute), // 30 print jobs per minute per client
 	}
 }
 
@@ -173,6 +181,24 @@ func (s *Server) handleTicket(ctx context.Context, conn *websocket.Conn, msg *Me
 	jobID := msg.ID
 	if jobID == "" {
 		jobID = uuid.New().String()
+	}
+
+	// ── RATE LIMIT ────────────────────────────────────────
+	clientAddr := fmt.Sprintf("%p", conn) // Using pointer address as client identifier
+	if !s.jobLimiter.Allow(clientAddr) {
+		log.Printf("[AUDIT] JOB_RATE_LIMITED | client=%s", clientAddr)
+		s.sendError(ctx, conn, jobID, "Rate limit exceeded: please wait before submitting more jobs")
+		return
+	}
+
+	// ── TOKEN VALIDATION ──────────────────────────────────
+	if config.AuthToken != "" {
+		token := msg.AuthToken
+		if token != config.AuthToken {
+			log.Printf("[AUDIT] JOB_REJECTED | reason=invalid_token | client=%s", clientAddr)
+			s.sendError(ctx, conn, jobID, "Invalid or missing auth token")
+			return
+		}
 	}
 
 	// Validate document exists

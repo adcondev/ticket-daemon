@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"nhooyr.io/websocket"
+	"github.com/coder/websocket"
 
 	"github.com/adcondev/poster/pkg/composer"
 	"github.com/adcondev/poster/pkg/connection"

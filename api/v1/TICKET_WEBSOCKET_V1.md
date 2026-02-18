@@ -60,7 +60,7 @@ Cliente                          Servidor                        Impresora
 
 ### 1. `ticket` - Enviar Trabajo de Impresión
 
-Encola un documento para impresión.
+Encola un documento para impresión. **Requiere autenticación si el servidor fue compilado con `AuthToken`.**
 
 **Estructura:**
 
@@ -68,19 +68,24 @@ Encola un documento para impresión.
 {
   "tipo": "ticket",
   "id": "pos1-20260115-001",
+  "auth_token": "tu-token-secreto",
   "datos": {
     "version": "1.0",
     "profile": { "model": "58mm PT-210", "paper_width": 58 },
-    "commands": [...]
+    "commands": [
+      "..."
+    ]
   }
 }
+
 ```
 
-| Campo   | Tipo   | Requerido | Descripción                                           |
-|---------|--------|-----------|-------------------------------------------------------|
-| `tipo`  | string | ✓         | Debe ser `"ticket"`                                   |
-| `id`    | string |           | ID del trabajo (si se omite, el servidor genera UUID) |
-| `datos` | object | ✓         | Documento de impresión (ver `document.schema.json`)   |
+| Campo        | Tipo   | Requerido | Descripción                                             |
+|--------------|--------|-----------|---------------------------------------------------------|
+| `tipo`       | string | ✓         | Debe ser `"ticket"`                                     |
+| `id`         | string |           | ID del trabajo (si se omite, el servidor genera UUID)   |
+| `auth_token` | string | ✓*        | Requerido si el servidor tiene `AuthToken` configurado. |
+| `datos`      | object | ✓         | Documento de impresión (ver `document.schema.json`)     |
 
 **Respuestas Posibles:**
 
@@ -417,9 +422,48 @@ Access-Control-Allow-Origin: *
 
 ---
 
+## 🔐 Autenticación
+
+El servidor puede configurarse con un `AUTH_TOKEN`. Si está activo:
+
+1. El Dashboard (`/`) requerirá inicio de sesión.
+2. Los mensajes WebSocket de tipo `ticket` deben incluir el campo `"auth_token"` en la raíz del JSON.
+
+**Respuesta de Error de Autenticación:**
+
+Si el token es incorrecto o falta, el servidor responderá con un error inmediato y **no encolará** el trabajo.
+
+```json
+{
+  "tipo": "error",
+  "id": "job-123",
+  "status": "error",
+  "mensaje": "Invalid or missing auth token"
+}
+
+```
+
+---
+
+## 🛡️ Seguridad y Límites
+
+### Autenticación
+
+Para enviar trabajos de impresión (`type: "ticket"`), es obligatorio incluir el campo `"auth_token"` coincidente con la
+configuración del servidor.
+
+### Rate Limiting
+
+El servidor protege la cola de impresión limitando la velocidad de peticiones:
+
+- **Límite:** 30 trabajos por minuto por conexión WebSocket.
+- **Respuesta:** Si se excede, se recibe un mensaje de tipo `error` con el texto "Rate limit exceeded".
+
+---
+
 ## Categorías de Error
 
-Los mensajes de error en `result` siguen un formato prefijado para facilitar el parsing:
+Los mensajes de error en logs siguen un formato prefijado:
 
 | Prefijo       | Descripción                       | Ejemplos                                       |
 |---------------|-----------------------------------|------------------------------------------------|
@@ -432,6 +476,7 @@ Los mensajes de error en `result` siguen un formato prefijado para facilitar el 
 | `IMAGE:`      | Error procesando imagen           | Invalid or corrupted base64 data               |
 | `COMMAND:`    | Error de comando desconocido      | Unknown command type                           |
 | `JSON:`       | Error de parsing JSON             | Invalid document structure                     |
+| `AUDIT:`      | Error de seguridad                | Invalid or missing auth token                  |
 | `EXECUTION:`  | Error durante ejecución           | (varios)                                       |
 | `ERROR:`      | Error genérico                    | (fallback)                                     |
 

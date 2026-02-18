@@ -66,6 +66,13 @@
         "datos": {
           "$ref": "ticket_document.schema.json",
           "description":  "Print document following the Poster document format v1.0"
+        },
+        "auth_token": {
+          "type": "string",
+          "description": "Security token required to authorize the print job",
+          "examples": [
+            "sec_12345"
+          ]
         }
       },
       "additionalProperties": false

@@ -18,6 +18,8 @@ utiliza la librería **Poster** como motor de renderizado ESC/POS.
 - 🖨️ **Servicio Nativo Windows**: Integración completa con SCM (Service Control Manager).
 - 📝 **Logging Estructurado**: Rotación automática de archivos (5 MB) para mantenimiento cero.
 - 🖨️ **Motor Poster**: Soporte avanzado para texto, códigos de barras, QR e imágenes.
+- 🔐 **Seguridad Dual**: Protección de Dashboard mediante Login, validación de Token y limitador de peticiones para
+  trabajos de impresión vía API.
 
 ---
 
@@ -256,16 +258,48 @@ Respuesta del servidor:
 
 ---
 
-## ⚙️ Configuración (Build-Time)
+## 🔐 Configuración de Seguridad (Build-Time)
 
-La configuración se inyecta al compilar para garantizar inmutabilidad en producción.
+Este servicio no usa archivos de configuración externos por seguridad. Las credenciales se inyectan al compilar:
 
-| Ambiente       | Flag   | Puerto           | Log Verbose | Servicio             |
-|----------------|--------|------------------|-------------|----------------------|
-| **Produccion** | `prod` | 8766 (0.0.0.0)   | `false`     | `TicketServicio`     |
-| **Test/Dev**   | `test` | 8766 (localhost) | `true`      | `TicketServicioTest` |
+1. **Dashboard Password:** Requiere un hash Bcrypt en base64.
+2. **Auth Token:** Token simple para validar los WebSockets.
 
-Para modificar los valores predeterminados, edite `internal/daemon/program.go` antes de compilar.
+Ver `Taskfile.yml` para ejemplos de compilación.
+
+---
+
+## ⚙️ Configuración y Compilación
+
+Este servicio no utiliza archivos de configuración en tiempo de ejecución (`.env` o `.yaml`) por seguridad. Las
+credenciales se inyectan directamente en el binario durante la compilación.
+
+### Variables de Build (LDFLAGS)
+
+Las variables residen en el paquete `github.com/adcondev/ticket-daemon/internal/config`:
+
+| Variable Go        | Descripción                                   | Ejemplo de Valor                    |
+|--------------------|-----------------------------------------------|-------------------------------------|
+| `AuthToken`        | Token para validar trabajos vía WebSocket     | `"mi-token-secreto"`                |
+| `PasswordHashB64`  | Hash Bcrypt (base64) para acceso al Dashboard | `"Jd8a..."` (generado externamente) |
+| `BuildEnvironment` | Define timeouts y comportamiento de logs      | `"local"` o `"remote"`              |
+
+### Ejemplo de Compilación Manual
+
+Para generar un binario seguro:
+
+```powershell
+# 1. Generar hash del password (usando herramienta auxiliar o externa)
+# ...
+
+# 2. Compilar inyectando variables
+go build -ldflags "-s -w \
+  -X github.com/adcondev/ticket-daemon/internal/config.AuthToken=mi-token-secreto 
+  -X '[github.com/adcondev/ticket-daemon/internal/config.PasswordHashB64=HASH_BASE64_AQUI](https://github.com/adcondev/ticket-daemon/' `
+  -X '[github.com/adcondev/ticket-daemon/internal/config.BuildEnvironment=local](https://github.com/adcondev/ticket-dae'" `
+  -o TicketServicio.exe ./cmd/TicketServicio
+
+```
 
 ---
 
@@ -374,10 +408,10 @@ ticket-daemon/
 
 Los logs se escriben en `%PROGRAMDATA%` y rotan automáticamente al superar 5 MB.
 
-| Ambiente | Ruta Tipica                                                |
-|----------|------------------------------------------------------------|
-| **Prod** | `C:\ProgramData\TicketServicio\TicketServicio.log`         |
-| **Test** | `C:\ProgramData\TicketServicioTest\TicketServicioTest.log` |
+| Ambiente     | Ruta Tipica                                                              |
+|--------------|--------------------------------------------------------------------------|
+| **`remote`** | `C:\ProgramData\R2k_TicketServicio_Remote\R2k_TicketServicio_Remote.log` |
+| **`local`**  | `C:\ProgramData\TicketServicioTest_Local\TicketServicioTest_Local.log`   |
 
 ### Ver Logs
 
@@ -386,7 +420,7 @@ Los logs se escriben en `%PROGRAMDATA%` y rotan automáticamente al superar 5 MB
 task logs
 
 # O directamente:
-Get-Content "C:\ProgramData\TicketServicioTest\TicketServicioTest.log" -Tail 100 -Wait
+Get-Content "C:\ProgramData\TicketServicioTest_Local\TicketServicioTest_Local.log" -Tail 100 -Wait
 ```
 
 ---
@@ -431,12 +465,12 @@ MIT © adcondev - RED 2000
 
 Este proyecto incluye documentación detallada del protocolo y formato de documentos:
 
-| Documento | Descripción |
-|-----------|-------------|
-| [DOCUMENT_V1.md](api/v1/DOCUMENT_V1.md) | Especificación del formato de documento de impresión |
-| [WEBSOCKET_V1.md](api/v1/WEBSOCKET_V1.md) | Especificación del protocolo WebSocket |
-| [document.schema.json](api/v1/document.schema.json) | JSON Schema para validación de documentos |
-| [websocket.schema.json](api/v1/websocket.schema.json) | JSON Schema para mensajes WebSocket |
+| Documento                                             | Descripción                                          |
+|-------------------------------------------------------|------------------------------------------------------|
+| [DOCUMENT_V1.md](api/v1/DOCUMENT_V1.md)               | Especificación del formato de documento de impresión |
+| [WEBSOCKET_V1.md](api/v1/WEBSOCKET_V1.md)             | Especificación del protocolo WebSocket               |
+| [document.schema.json](api/v1/document.schema.json)   | JSON Schema para validación de documentos            |
+| [websocket.schema.json](api/v1/websocket.schema.json) | JSON Schema para mensajes WebSocket                  |
 
 ### Ejemplos de Uso
 

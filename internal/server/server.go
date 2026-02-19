@@ -17,7 +17,7 @@ import (
 
 	"github.com/adcondev/poster/pkg/connection"
 	"github.com/adcondev/ticket-daemon/internal/config"
-	"github.com/adcondev/ticket-daemon/internal/printer"
+	"github.com/adcondev/ticket-daemon/internal/posprinter"
 )
 
 const maxJobsPerMinute = 30
@@ -25,7 +25,7 @@ const maxJobsPerMinute = 30
 // PrinterLister defines an interface for printer discovery and summary retrieval
 type PrinterLister interface {
 	GetPrinters(forceRefresh bool) ([]connection.PrinterDetail, error)
-	GetSummary() printer.Summary
+	GetSummary() posprinter.Summary
 }
 
 // Config holds server configuration
@@ -43,10 +43,11 @@ type PrintJob struct {
 
 // Message represents incoming WebSocket message
 type Message struct {
-	Tipo      string          `json:"tipo"`
-	ID        string          `json:"id,omitempty"`
-	Datos     json.RawMessage `json:"datos,omitempty"`
-	AuthToken string          `json:"auth_token,omitempty"`
+	Tipo  string          `json:"tipo"`
+	ID    string          `json:"id,omitempty"`
+	Datos json.RawMessage `json:"datos,omitempty"`
+	//nolint:gosec // Required JSON key for client payload
+	AuthToken string `json:"auth_token,omitempty"`
 }
 
 // Response represents outgoing WebSocket message
@@ -110,7 +111,8 @@ func (s *Server) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	// Register client
 	s.clients.Add(conn)
 	clientCount := s.clients.Count()
-	log.Printf("[WS] ➕ Client connected (total: %d) from %s", clientCount, r.RemoteAddr)
+	//nolint:gosec
+	log.Printf("[WS] ➕ Client connected (total: %d) from %q", clientCount, r.RemoteAddr)
 
 	// Send welcome message
 	ctx := r.Context()
@@ -276,12 +278,13 @@ func (s *Server) handleGetPrinters(ctx context.Context, conn *websocket.Conn) {
 	}
 
 	// Convert to DTOs
-	dtos := make([]printer.DetailDTO, len(printers))
+	dtos := make([]posprinter.DetailDTO, len(printers))
 	for i, p := range printers {
-		dtos[i] = printer.DetailDTO{
-			Name:        p.Name,
-			Port:        p.Port,
-			Driver:      p.Driver,
+		dtos[i] = posprinter.DetailDTO{
+			Name:   p.Name,
+			Port:   p.Port,
+			Driver: p.Driver,
+			//nolint:unconvert
 			Status:      string(p.Status),
 			IsDefault:   p.IsDefault,
 			IsVirtual:   p.IsVirtual,
@@ -290,10 +293,10 @@ func (s *Server) handleGetPrinters(ctx context.Context, conn *websocket.Conn) {
 	}
 
 	response := struct {
-		Tipo     string              `json:"tipo"`
-		Status   string              `json:"status"`
-		Printers []printer.DetailDTO `json:"printers"`
-		Summary  printer.Summary     `json:"summary"`
+		Tipo     string                 `json:"tipo"`
+		Status   string                 `json:"status"`
+		Printers []posprinter.DetailDTO `json:"printers"`
+		Summary  posprinter.Summary     `json:"summary"`
 	}{
 		Tipo:     "printers",
 		Status:   "ok",

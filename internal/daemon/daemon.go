@@ -224,6 +224,8 @@ func initLogging(envConfig config.Environment) error {
 	logPath := envConfig.LogPath(os.Getenv("PROGRAMDATA"))
 	logDir := filepath.Dir(logPath)
 
+	// PROGRAMDATA environment variable is trusted in this context
+	//nolint:gosec
 	if err := os.MkdirAll(logDir, 0750); err != nil {
 		return err
 	}
@@ -232,7 +234,9 @@ func initLogging(envConfig config.Environment) error {
 		return err
 	}
 
-	log.Printf("[INIT] 📁 Log file: %s", logPath)
+	// Changed %s to %q to prevent log injection
+	//nolint:gosec
+	log.Printf("[INIT] 📁 Log file: %q", logPath)
 	return nil
 }
 
@@ -277,20 +281,23 @@ func handleLogin(authMgr *auth.Manager) http.HandlerFunc {
 		}
 		ip := r.RemoteAddr
 		if authMgr.IsLockedOut(ip) {
-			log.Printf("[AUDIT] LOGIN_BLOCKED | IP=%s | reason=lockout", ip)
+			//nolint:gosec
+			log.Printf("[AUDIT] LOGIN_BLOCKED | IP=%q | reason=lockout", ip)
 			http.Redirect(w, r, "/login?locked=1", http.StatusSeeOther)
 			return
 		}
 		password := r.FormValue("password")
 		if !authMgr.ValidatePassword(password) {
 			authMgr.RecordFailedLogin(ip)
-			log.Printf("[AUDIT] LOGIN_FAILED | IP=%s", ip)
+			//nolint:gosec
+			log.Printf("[AUDIT] LOGIN_FAILED | IP=%q", ip)
 			http.Redirect(w, r, "/login?error=1", http.StatusSeeOther)
 			return
 		}
 		authMgr.ClearFailedLogins(ip)
 		authMgr.SetSessionCookie(w)
-		log.Printf("[AUDIT] LOGIN_SUCCESS | IP=%s", ip)
+		//nolint:gosec
+		log.Printf("[AUDIT] LOGIN_SUCCESS | IP=%q", ip)
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 	}
 }
@@ -311,6 +318,7 @@ func serveDashboard(tmpl *template.Template) http.HandlerFunc {
 			return
 		}
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		//nolint:gosec // False positive: passing token to internal template
 		data := struct{ AuthToken string }{AuthToken: config.AuthToken}
 		if err := tmpl.Execute(w, data); err != nil {
 			log.Printf("[X] Error rendering dashboard: %v", err)

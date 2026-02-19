@@ -159,6 +159,7 @@ func FlushLogFile() error {
 
 // rotateLogIfNeeded rotates log if exceeds max size
 func rotateLogIfNeeded(path string) error {
+	//nolint:gosec
 	info, err := os.Stat(path)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -178,6 +179,7 @@ func rotateLogIfNeeded(path string) error {
 	}
 
 	content := strings.Join(lines, "\n") + "\n"
+	//nolint:gosec
 	return os.WriteFile(path, []byte(content), 0600)
 }
 

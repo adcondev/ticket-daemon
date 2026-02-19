@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/adcondev/poster/pkg/connection"
-	"github.com/adcondev/ticket-daemon/internal/printer"
+	"github.com/adcondev/ticket-daemon/internal/posprinter"
 )
 
 // PrinterDiscovery handles printer enumeration with caching
@@ -53,10 +53,10 @@ func (pd *PrinterDiscovery) GetPrinters(forceRefresh bool) ([]connection.Printer
 }
 
 // GetSummary returns a lightweight summary for health checks
-func (pd *PrinterDiscovery) GetSummary() printer.Summary {
+func (pd *PrinterDiscovery) GetSummary() posprinter.Summary {
 	printers, err := pd.GetPrinters(false)
 	if err != nil {
-		return printer.Summary{Status: "error", DetectedCount: 0}
+		return posprinter.Summary{Status: "error", DetectedCount: 0}
 	}
 
 	thermal := connection.FilterThermalPrinters(printers)
@@ -77,7 +77,7 @@ func (pd *PrinterDiscovery) GetSummary() printer.Summary {
 		status = "error"
 	}
 
-	return printer.Summary{
+	return posprinter.Summary{
 		Status:        status,
 		DetectedCount: len(printers),
 		ThermalCount:  len(thermal),

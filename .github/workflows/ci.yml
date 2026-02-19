@@ -36,14 +36,17 @@ jobs:
         uses: actions/checkout@v6
         with:
           repository: adcondev/poster
-          ref: master
-          path: ../poster
+          path: poster
 
       - name: Setup Go
         uses: actions/setup-go@v6
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
+
+      - name: Patch Go modules for CI
+        run: |
+          go mod edit -replace github.com/adcondev/poster=./poster
 
       - name: Run tests with race detection
         run: go test -v -race -coverprofile=coverage.txt -covermode=atomic ./...
@@ -63,7 +66,7 @@ jobs:
           flags: unittests
           name: codecov-ubuntu
           fail_ci_if_error: false
-          token: ${{ secrets.CODECOV_TOKEN }} # Ensure this secret is set in repo settings
+          token: ${{ secrets.CODECOV_TOKEN }}
 
   benchmark:
     name: ⚡ Performance Benchmarks
@@ -80,6 +83,12 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Checkout Poster library
+        uses: actions/checkout@v6
+        with:
+          repository: adcondev/poster
+          path: poster
+
       - name: Setup Go
         uses: actions/setup-go@v6
         with:
@@ -89,14 +98,20 @@ jobs:
       - name: Run benchmarks (base)
         continue-on-error: true
         run: |
-          git clean -fdx
+          # Ignore our cloned repos so git clean doesn't delete them
+          git clean -fdx -e poster/
+          git reset --hard
           git checkout ${{ github.event.pull_request.base.sha }}
-          go test -bench=. -benchmem -run=^$ ./... > /tmp/base-benchmark.txt 2>&1
+          # Re-apply the patch because checkout restores the base go.mod
+          go mod edit -replace github.com/adcondev/poster=./poster
+          go test -bench=. -benchmem -run=^$ ./... > /tmp/base-benchmark.txt 2>&1 || true
 
       - name: Run benchmarks (current)
         run: |
-          git clean -fdx
+          git clean -fdx -e poster/
+          git reset --hard
           git checkout ${{ github.event.pull_request.head.sha }}
+          go mod edit -replace github.com/adcondev/poster=./poster
           go test -bench=. -benchmem -run=^$ ./... > /tmp/current-benchmark.txt 2>&1
 
       - name: Compare benchmarks
@@ -171,18 +186,28 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
+      - name: Checkout Poster library
+        uses: actions/checkout@v6
+        with:
+          repository: adcondev/poster
+          path: poster
+
       - name: Setup Go
         uses: actions/setup-go@v6
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
 
+      - name: Patch Go modules for CI
+        run: |
+          go mod edit -replace github.com/adcondev/poster=./poster
+
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v9
         with:
           version: latest
           skip-cache: false
-          args: --config=./.golangci.yml --timeout=5m
+          args: --config=.golangci.yml --timeout=5m
 
   build:
     name: 🏗️ Build Check
@@ -192,11 +217,21 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
+      - name: Checkout Poster library
+        uses: actions/checkout@v6
+        with:
+          repository: adcondev/poster
+          path: poster
+
       - name: Setup Go
         uses: actions/setup-go@v6
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
+
+      - name: Patch Go modules for CI
+        run: |
+          go mod edit -replace github.com/adcondev/poster=./poster
 
       - name: Install Task
         uses: arduino/setup-task@v2
@@ -206,10 +241,8 @@ jobs:
 
       - name: Build via Taskfile
         env:
-          # Force Windows build since artifact name is .exe
           GOOS: windows
           GOARCH: amd64
-          # Map secrets or use safe defaults for the build check
           TICKET_AUTH_TOKEN: ${{ secrets.TICKET_AUTH_TOKEN || 'build-token' }}
           TICKET_DASHBOARD_HASH: ${{ secrets.TICKET_DASHBOARD_HASH || '' }}
           BUILD_ENV: 'remote'

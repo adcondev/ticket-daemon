@@ -1,5 +1,5 @@
-// Package printer contains shared types to avoid import cycles.
-package printer
+// Package posprinter contains shared types to avoid import cycles.
+package posprinter
 
 // Summary PrinterSummary provides lightweight overview for health checks
 type Summary struct {

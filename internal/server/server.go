@@ -4,23 +4,28 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"strconv"
 	"sync"
 	"time"
 
+	"github.com/coder/websocket"
+	"github.com/coder/websocket/wsjson"
 	"github.com/google/uuid"
-	"nhooyr.io/websocket"
-	"nhooyr.io/websocket/wsjson"
 
 	"github.com/adcondev/poster/pkg/connection"
-	"github.com/adcondev/ticket-daemon/internal/printer"
+	"github.com/adcondev/ticket-daemon/internal/config"
+	"github.com/adcondev/ticket-daemon/internal/posprinter"
 )
 
+const maxJobsPerMinute = 30
+
+// PrinterLister defines an interface for printer discovery and summary retrieval
 type PrinterLister interface {
 	GetPrinters(forceRefresh bool) ([]connection.PrinterDetail, error)
-	GetSummary() printer.Summary
+	GetSummary() posprinter.Summary
 }
 
 // Config holds server configuration
@@ -41,6 +46,8 @@ type Message struct {
 	Tipo  string          `json:"tipo"`
 	ID    string          `json:"id,omitempty"`
 	Datos json.RawMessage `json:"datos,omitempty"`
+	//nolint:gosec // Required JSON key for client payload
+	AuthToken string `json:"auth_token,omitempty"`
 }
 
 // Response represents outgoing WebSocket message
@@ -61,6 +68,7 @@ type Server struct {
 	shutdownOnce     sync.Once
 	shutdownChan     chan struct{}
 	printerDiscovery PrinterLister
+	jobLimiter       *JobRateLimiter
 }
 
 // NewServer creates a new WebSocket server
@@ -75,6 +83,7 @@ func NewServer(cfg Config, discovery PrinterLister) *Server {
 		queueSize:        cfg.QueueSize,
 		shutdownChan:     make(chan struct{}),
 		printerDiscovery: discovery,
+		jobLimiter:       NewJobRateLimiter(maxJobsPerMinute), // 30 print jobs per minute per client
 	}
 }
 
@@ -102,7 +111,8 @@ func (s *Server) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	// Register client
 	s.clients.Add(conn)
 	clientCount := s.clients.Count()
-	log.Printf("[WS] ➕ Client connected (total: %d) from %s", clientCount, r.RemoteAddr)
+	//nolint:gosec
+	log.Printf("[WS] ➕ Client connected (total: %d) from %q", clientCount, r.RemoteAddr)
 
 	// Send welcome message
 	ctx := r.Context()
@@ -173,6 +183,24 @@ func (s *Server) handleTicket(ctx context.Context, conn *websocket.Conn, msg *Me
 	jobID := msg.ID
 	if jobID == "" {
 		jobID = uuid.New().String()
+	}
+
+	// ── RATE LIMIT ────────────────────────────────────────
+	clientAddr := fmt.Sprintf("%p", conn) // Using pointer address as client identifier
+	if !s.jobLimiter.Allow(clientAddr) {
+		log.Printf("[AUDIT] JOB_RATE_LIMITED | client=%s", clientAddr)
+		s.sendError(ctx, conn, jobID, "Rate limit exceeded: please wait before submitting more jobs")
+		return
+	}
+
+	// ── TOKEN VALIDATION ──────────────────────────────────
+	if config.AuthToken != "" {
+		token := msg.AuthToken
+		if token != config.AuthToken {
+			log.Printf("[AUDIT] JOB_REJECTED | reason=invalid_token | client=%s", clientAddr)
+			s.sendError(ctx, conn, jobID, "Invalid or missing auth token")
+			return
+		}
 	}
 
 	// Validate document exists
@@ -250,12 +278,13 @@ func (s *Server) handleGetPrinters(ctx context.Context, conn *websocket.Conn) {
 	}
 
 	// Convert to DTOs
-	dtos := make([]printer.DetailDTO, len(printers))
+	dtos := make([]posprinter.DetailDTO, len(printers))
 	for i, p := range printers {
-		dtos[i] = printer.DetailDTO{
-			Name:        p.Name,
-			Port:        p.Port,
-			Driver:      p.Driver,
+		dtos[i] = posprinter.DetailDTO{
+			Name:   p.Name,
+			Port:   p.Port,
+			Driver: p.Driver,
+			//nolint:unconvert
 			Status:      string(p.Status),
 			IsDefault:   p.IsDefault,
 			IsVirtual:   p.IsVirtual,
@@ -264,10 +293,10 @@ func (s *Server) handleGetPrinters(ctx context.Context, conn *websocket.Conn) {
 	}
 
 	response := struct {
-		Tipo     string              `json:"tipo"`
-		Status   string              `json:"status"`
-		Printers []printer.DetailDTO `json:"printers"`
-		Summary  printer.Summary     `json:"summary"`
+		Tipo     string                 `json:"tipo"`
+		Status   string                 `json:"status"`
+		Printers []posprinter.DetailDTO `json:"printers"`
+		Summary  posprinter.Summary     `json:"summary"`
 	}{
 		Tipo:     "printers",
 		Status:   "ok",

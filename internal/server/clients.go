@@ -4,7 +4,7 @@ package server
 import (
 	"sync"
 
-	"nhooyr.io/websocket"
+	"github.com/coder/websocket"
 )
 
 // ClientRegistry manages connected WebSocket clients thread-safely

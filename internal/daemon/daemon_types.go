@@ -1,17 +1,17 @@
 package daemon
 
 import (
-	"github.com/adcondev/ticket-daemon/internal/printer"
+	"github.com/adcondev/ticket-daemon/internal/posprinter"
 )
 
 // HealthResponse representa el estado de salud del servicio de impresión.
 type HealthResponse struct {
-	Status   string          `json:"status"`
-	Queue    QueueStatus     `json:"queue"`
-	Worker   WorkerStatus    `json:"worker"`
-	Printers printer.Summary `json:"printers"` // NEW
-	Build    BuildInfo       `json:"build"`
-	Uptime   int             `json:"uptime_seconds"`
+	Status   string             `json:"status"`
+	Queue    QueueStatus        `json:"queue"`
+	Worker   WorkerStatus       `json:"worker"`
+	Printers posprinter.Summary `json:"printers"` // NEW
+	Build    BuildInfo          `json:"build"`
+	Uptime   int                `json:"uptime_seconds"`
 }
 
 // QueueStatus representa el estado de la cola de impresión.

@@ -40,13 +40,15 @@ function setupEventListeners() {
       showToast('Corrige los errores del JSON primero', 'error');
       return;
     }
-
     try {
       const payload = JSON.parse(el.jsonEditor.value);
       const jobId = `job-${Date.now()}`;
-      // Estructura del mensaje: { tipo: 'ticket', id: '...', datos: { ... } }
-      const msg = {tipo: 'ticket', id: jobId, datos: payload};
-
+      const msg = {
+        tipo: 'ticket',
+        id: jobId,
+        datos: payload,
+        auth_token: getAuthToken()
+      };
       if (sendMessage(msg)) {
         addLog('SENT', `📤 Trabajo: ${jobId}`);
         state.jobsSent++;
@@ -68,7 +70,6 @@ function setupEventListeners() {
 
   document.getElementById('btnBurstConfirm').addEventListener('click', () => {
     el.burstModal.classList.remove('show');
-
     let payload;
     try {
       payload = JSON.parse(el.jsonEditor.value);
@@ -76,16 +77,18 @@ function setupEventListeners() {
       payload = TEMPLATES.burstable;
       addLog('INFO', '⚠️ Usando plantilla Ráfaga');
     }
-
     addLog('INFO', '🔥 RÁFAGA: Enviando 10 trabajos...');
-
     for (let i = 0; i < 10; i++) {
       const jobId = `burst-${Date.now()}-${i}`;
-      if (sendMessage({tipo: 'ticket', id: jobId, datos: payload})) {
+      if (sendMessage({
+        tipo: 'ticket',
+        id: jobId,
+        datos: payload,
+        auth_token: getAuthToken()
+      })) {
         state.jobsSent++;
       }
     }
-
     el.jobsSentVal.textContent = state.jobsSent;
     showToast('Ráfaga: ¡10 trabajos enviados!', 'warning');
     setTimeout(fetchHealth, 100);

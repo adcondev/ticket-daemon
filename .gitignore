@@ -24,8 +24,10 @@ profile.cov
 go.work
 go.work.sum
 
-# env file
+# Security - never commit secrets
 .env
+.env.*
+!.env.example
 
 # Editor/IDE
 # .idea/

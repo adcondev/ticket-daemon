@@ -154,11 +154,13 @@ func (w *Worker) processJob(job *server.PrintJob) {
 		}
 	}
 
-	// Notify client
+	// Notify client (async to not block worker loop)
 	if job.ClientConn != nil && w.notifier != nil {
-		if err := w.notifier.NotifyClient(job.ClientConn, response); err != nil {
-			log.Printf("[WORKER] ⚠️ Failed to notify client for job %s: %v", job.ID, err)
-		}
+		go func() {
+			if err := w.notifier.NotifyClient(job.ClientConn, response); err != nil {
+				log.Printf("[WORKER] ⚠️ Failed to notify client for job %s: %v", job.ID, err)
+			}
+		}()
 	}
 }
 

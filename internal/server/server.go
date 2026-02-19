@@ -324,6 +324,15 @@ func (s *Server) NotifyClient(conn *websocket.Conn, response Response) error {
 		return nil
 	}
 
+	mu := s.clients.GetMutex(conn)
+	if mu == nil {
+		// Client disconnected or not registered
+		return nil
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 

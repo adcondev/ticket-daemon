@@ -1,3 +1,4 @@
+// Package workererrors provides error handling and formatting utilities for the worker package.
 package workererrors
 
 import (

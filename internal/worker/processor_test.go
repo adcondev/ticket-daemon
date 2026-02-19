@@ -14,7 +14,7 @@ type mockSlowNotifier struct {
 	delay time.Duration
 }
 
-func (m *mockSlowNotifier) NotifyClient(_ *websocket.Conn, response server.Response) error {
+func (m *mockSlowNotifier) NotifyClient(_ *websocket.Conn, _ server.Response) error {
 	time.Sleep(m.delay)
 	return nil
 }

@@ -43,7 +43,8 @@ type Environment struct {
 	Verbose bool
 
 	// Impresora
-	DefaultPrinter string
+	DefaultPrinter  string
+	PrinterCacheTTL time.Duration
 }
 
 // LogPath returns the full log file path for this environment.
@@ -55,26 +56,28 @@ func (e Environment) LogPath(programData string) string {
 // environments defines available deployment configurations
 var environments = map[string]Environment{
 	"remote": {
-		Name:           "REMOTO",
-		ServiceName:    ServiceName,
-		ListenAddr:     "0.0.0.0:" + ServerPort,
-		ReadTimeout:    15 * time.Second,
-		WriteTimeout:   15 * time.Second,
-		IdleTimeout:    60 * time.Second,
-		QueueCapacity:  50,
-		Verbose:        false,
-		DefaultPrinter: "",
+		Name:            "REMOTO",
+		ServiceName:     ServiceName,
+		ListenAddr:      "0.0.0.0:" + ServerPort,
+		ReadTimeout:     15 * time.Second,
+		WriteTimeout:    15 * time.Second,
+		IdleTimeout:     60 * time.Second,
+		QueueCapacity:   50,
+		Verbose:         false,
+		DefaultPrinter:  "",
+		PrinterCacheTTL: 30 * time.Second,
 	},
 	"local": {
-		Name:           "LOCAL",
-		ServiceName:    ServiceName,
-		ListenAddr:     "localhost:" + ServerPort,
-		ReadTimeout:    30 * time.Second,
-		WriteTimeout:   30 * time.Second,
+		Name:            "LOCAL",
+		ServiceName:     ServiceName,
+		ListenAddr:      "localhost:" + ServerPort,
+		ReadTimeout:     30 * time.Second,
+		WriteTimeout:    30 * time.Second,
 		IdleTimeout:    120 * time.Second,
-		QueueCapacity:  50,
-		Verbose:        true,
-		DefaultPrinter: "58mm PT-210",
+		QueueCapacity:   50,
+		Verbose:         true,
+		DefaultPrinter:  "58mm PT-210",
+		PrinterCacheTTL: 30 * time.Second,
 	},
 }
 

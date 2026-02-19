@@ -22,4 +22,4 @@ require (
 	golang.org/x/text v0.34.0 // indirect
 )
 
-replace github.com/adcondev/poster => ../poster
+replace github.com/adcondev/poster => ./mock_poster

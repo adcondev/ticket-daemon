@@ -28,7 +28,8 @@ func NewPrinterDiscovery() *PrinterDiscovery {
 func (pd *PrinterDiscovery) GetPrinters(forceRefresh bool) ([]connection.PrinterDetail, error) {
 	pd.mu.RLock()
 	if !forceRefresh && time.Since(pd.lastRefresh) < pd.cacheTTL && pd.cache != nil {
-		result := pd.cache
+		result := make([]connection.PrinterDetail, len(pd.cache))
+		copy(result, pd.cache)
 		pd.mu.RUnlock()
 		return result, nil
 	}
@@ -39,17 +40,27 @@ func (pd *PrinterDiscovery) GetPrinters(forceRefresh bool) ([]connection.Printer
 
 	// Double-check after acquiring write lock (refinement #2)
 	if !forceRefresh && time.Since(pd.lastRefresh) < pd.cacheTTL && pd.cache != nil {
-		return pd.cache, nil
+		result := make([]connection.PrinterDetail, len(pd.cache))
+		copy(result, pd.cache)
+		return result, nil
 	}
 
 	printers, err := connection.ListAvailablePrinters()
 	if err != nil {
-		return pd.cache, err // Return stale cache on error
+		if pd.cache != nil {
+			result := make([]connection.PrinterDetail, len(pd.cache))
+			copy(result, pd.cache)
+			return result, err // Return stale cache copy on error
+		}
+		return nil, err
 	}
 
 	pd.cache = printers
 	pd.lastRefresh = time.Now()
-	return printers, nil
+
+	result := make([]connection.PrinterDetail, len(printers))
+	copy(result, printers)
+	return result, nil
 }
 
 // GetSummary returns a lightweight summary for health checks

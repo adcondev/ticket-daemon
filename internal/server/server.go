@@ -138,6 +138,7 @@ func (s *Server) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		return
 	}
+	//nolint:gosec // Client count is an integer and safe to log
 	log.Printf("[WS] ➖ Client disconnected (remaining: %d)", s.clients.Count())
 }
 

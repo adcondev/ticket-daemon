@@ -7,14 +7,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/coder/websocket"
 	"github.com/adcondev/poster/pkg/connection"
 	"github.com/adcondev/ticket-daemon/internal/posprinter"
-	"github.com/coder/websocket"
 )
 
 type mockPrinterDiscovery struct{}
 
-func (m *mockPrinterDiscovery) GetPrinters(forceRefresh bool) ([]connection.PrinterDetail, error) {
+func (m *mockPrinterDiscovery) GetPrinters(_ bool) ([]connection.PrinterDetail, error) {
 	return []connection.PrinterDetail{}, nil
 }
 
@@ -49,11 +49,14 @@ func TestWebSocketOrigin(t *testing.T) {
 			},
 		}
 
-		conn, _, err := websocket.Dial(ctx, u, opts)
+		conn, resp, err := websocket.Dial(ctx, u, opts)
+		if resp != nil && resp.Body != nil {
+			_ = resp.Body.Close()
+		}
 		if err != nil {
 			t.Fatalf("Connection from good.com failed: %v", err)
 		}
-		conn.Close(websocket.StatusNormalClosure, "")
+		_ = conn.Close(websocket.StatusNormalClosure, "")
 
 		// Case B: Connection from Disallowed Origin
 		optsBad := &websocket.DialOptions{
@@ -62,7 +65,10 @@ func TestWebSocketOrigin(t *testing.T) {
 			},
 		}
 
-		_, _, err = websocket.Dial(ctx, u, optsBad)
+		_, respBad, err := websocket.Dial(ctx, u, optsBad)
+		if respBad != nil && respBad.Body != nil {
+			_ = respBad.Body.Close()
+		}
 		if err == nil {
 			t.Fatalf("Connection from evil.com succeeded (should fail)")
 		}
@@ -88,11 +94,14 @@ func TestWebSocketOrigin(t *testing.T) {
 		defer cancel()
 
 		// websocket.Dial sets Origin to the URL's host by default, mimicking a same-origin request
-		conn, _, err := websocket.Dial(ctx, u, nil)
+		conn, resp, err := websocket.Dial(ctx, u, nil)
+		if resp != nil && resp.Body != nil {
+			_ = resp.Body.Close()
+		}
 		if err != nil {
 			t.Fatalf("Connection from same origin failed: %v", err)
 		}
-		conn.Close(websocket.StatusNormalClosure, "")
+		_ = conn.Close(websocket.StatusNormalClosure, "")
 
 		// Case B: Connection from Different Origin
 		optsBad := &websocket.DialOptions{
@@ -100,7 +109,10 @@ func TestWebSocketOrigin(t *testing.T) {
 				"Origin": []string{"http://external-site.com"},
 			},
 		}
-		_, _, err = websocket.Dial(ctx, u, optsBad)
+		_, respBad, err := websocket.Dial(ctx, u, optsBad)
+		if respBad != nil && respBad.Body != nil {
+			_ = respBad.Body.Close()
+		}
 		if err == nil {
 			t.Fatalf("Connection from external-site.com succeeded (should fail)")
 		}

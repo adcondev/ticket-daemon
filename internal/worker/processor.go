@@ -118,10 +118,10 @@ func (w *Worker) processJob(job *server.PrintJob) {
 	err := w.executePrint(job)
 
 	duration := time.Since(startTime)
-	w.lastJobTime = time.Now()
 
 	// Update statistics
 	w.mu.Lock()
+	w.lastJobTime = time.Now()
 	if err != nil {
 		w.jobsFailed++
 	} else {

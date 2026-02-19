@@ -30,7 +30,8 @@ type PrinterLister interface {
 
 // Config holds server configuration
 type Config struct {
-	QueueSize int
+	QueueSize      int
+	AllowedOrigins []string
 }
 
 // PrintJob represents a queued print request
@@ -69,6 +70,7 @@ type Server struct {
 	shutdownChan     chan struct{}
 	printerDiscovery PrinterLister
 	jobLimiter       *JobRateLimiter
+	allowedOrigins   []string
 }
 
 // NewServer creates a new WebSocket server
@@ -84,6 +86,7 @@ func NewServer(cfg Config, discovery PrinterLister) *Server {
 		shutdownChan:     make(chan struct{}),
 		printerDiscovery: discovery,
 		jobLimiter:       NewJobRateLimiter(maxJobsPerMinute), // 30 print jobs per minute per client
+		allowedOrigins:   cfg.AllowedOrigins,
 	}
 }
 
@@ -99,10 +102,13 @@ func (s *Server) JobQueue() <-chan *PrintJob {
 
 // HandleWebSocket handles WebSocket connections
 func (s *Server) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
-	conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{
-		InsecureSkipVerify: true,
-		OriginPatterns:     []string{"*"},
-	})
+	opts := &websocket.AcceptOptions{
+		OriginPatterns: s.allowedOrigins,
+		// InsecureSkipVerify is intentionally omitted (defaults to false)
+		// to enforce Origin check against OriginPatterns or Host.
+	}
+
+	conn, err := websocket.Accept(w, r, opts)
 	if err != nil {
 		log.Printf("[WS] ❌ Error accepting client: %v", err)
 		return

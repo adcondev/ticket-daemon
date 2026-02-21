@@ -604,7 +604,7 @@ class TicketClient {
      * Envía un documento a imprimir
      * @param {Object} document - Objeto JSON con estructura de Poster
      * @param {string} [id] - ID opcional del trabajo
-     * @param {string} [authToken] - Token de autenticación si el servidor lo requiere
+     * @param {string} [auth_token] - Token de autenticación si el servidor lo requiere
      */
     print(document, id = null, authToken = null) {
         if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {

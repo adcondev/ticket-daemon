@@ -18,9 +18,9 @@ type PrinterDiscovery struct {
 }
 
 // NewPrinterDiscovery creates a new discovery service
-func NewPrinterDiscovery() *PrinterDiscovery {
+func NewPrinterDiscovery(cacheTTL time.Duration) *PrinterDiscovery {
 	return &PrinterDiscovery{
-		cacheTTL: 30 * time.Second,
+		cacheTTL: cacheTTL,
 	}
 }
 

@@ -1,4 +1,38 @@
-# Ticket Daemon - WebSocket API v1.0.0
+# Ticket Daemon - WebSocket API v1.0
+
+## Índice
+
+- [Descripción General](#descripción-general)
+- [Endpoints](#endpoints)
+  - [Configuración por Ambiente](#configuración-por-ambiente)
+- [Protocolo WebSocket](#protocolo-websocket)
+  - [Ciclo de Vida de Conexión](#ciclo-de-vida-de-conexión)
+  - [Flujo de Trabajo de Impresión](#flujo-de-trabajo-de-impresión)
+- [Mensajes del Cliente → Servidor](#mensajes-del-cliente--servidor)
+  - [1. ticket - Enviar Trabajo de Impresión](#1-ticket---enviar-trabajo-de-impresión)
+  - [2. status - Consultar Estado de Cola](#2-status---consultar-estado-de-cola)
+  - [3. ping - Verificar Conectividad](#3-ping---verificar-conectividad)
+  - [4. get_printers - Listar Impresoras](#4-get_printers---listar-impresoras)
+- [Mensajes del Servidor → Cliente](#mensajes-del-servidor--cliente)
+  - [1. info - Mensaje Informativo](#1-info---mensaje-informativo)
+  - [2. ack - Confirmación de Encolamiento](#2-ack---confirmación-de-encolamiento)
+  - [3. result - Resultado de Impresión](#3-result---resultado-de-impresión)
+  - [4. error - Error Inmediato](#4-error---error-inmediato)
+  - [5. pong - Respuesta a Ping](#5-pong---respuesta-a-ping)
+  - [6. status - Estado de Cola](#6-status---estado-de-cola)
+  - [7. printers - Lista de Impresoras](#7-printers---lista-de-impresoras)
+- [HTTP Endpoints](#http-endpoints)
+  - [GET /health](#get-health)
+- [Autenticación](#autenticación)
+- [Seguridad y Límites](#seguridad-y-límites)
+  - [Rate Limiting](#rate-limiting)
+  - [Límites y Consideraciones](#límites-y-consideraciones)
+- [Categorías de Error](#categorías-de-error)
+- [Ejemplos de Integración](#ejemplos-de-integración)
+  - [JavaScript (Browser)](#javascript-browser)
+  - [Go](#go)
+  - [cURL (Health Check)](#curl-health-check)
+- [Versionado](#versionado)
 
 ## Descripción General
 
@@ -163,7 +197,7 @@ Enviado al conectar (bienvenida) o para notificaciones generales.
 {
   "tipo": "info",
   "status": "connected",
-  "mensaje": "Connected to Ticket Daemon print server"
+  "mensaje": "✅ Servidor respondiendo desde Ticket Daemon"
 }
 ```
 
@@ -260,11 +294,12 @@ Enviado cuando hay un error de validación o la cola está llena (antes de encol
 
 **Errores Comunes:**
 
-| Mensaje                                           | Causa                              |
-|---------------------------------------------------|------------------------------------|
-| `Field 'datos' is required for type 'ticket'`     | Falta el campo `datos`             |
-| `Queue full, please retry in a few seconds`       | Cola saturada (100 trabajos)       |
-| `Unknown message type: xxx`                       | Tipo de mensaje no reconocido      |
+| Mensaje                                                        | Causa                              |
+|----------------------------------------------------------------|------------------------------------|
+| `Field 'datos' is required for type 'ticket'`                  | Falta el campo `datos`             |
+| `Queue full, please retry in a few seconds`                    | Cola saturada (100 trabajos)       |
+| `Rate limit exceeded: please wait before submitting more jobs` | Límite de 30 trabajos/min excedido |
+| `Unknown message type: xxx`                                    | Tipo de mensaje no reconocido      |
 
 ---
 
@@ -397,19 +432,25 @@ Host: localhost:8766
   "queue": {
     "current": 2,
     "capacity": 100,
-    "utilization": 2.0
+    "utilization": 4.0
   },
   "worker": {
     "running": true,
     "jobs_processed": 1547,
     "jobs_failed": 3
   },
-  "build": {
-    "env": "prod",
-    "date": "2026-01-15",
-    "time": "10:30:00"
+  "printers": {
+    "status": "ok",
+    "detected_count": 2,
+    "thermal_count": 1,
+    "default_name": "58mm PT-210"
   },
-  "uptime_seconds": 86400
+  "build": {
+    "env": "local",
+    "date": "unknown",
+    "time": "unknown"
+  },
+  "uptime": 86400
 }
 ```
 
@@ -422,7 +463,7 @@ Access-Control-Allow-Origin: *
 
 ---
 
-## 🔐 Autenticación
+## Autenticación
 
 El servidor puede configurarse con un `AUTH_TOKEN`. Si está activo:
 
@@ -431,7 +472,9 @@ El servidor puede configurarse con un `AUTH_TOKEN`. Si está activo:
 
 **Respuesta de Error de Autenticación:**
 
-Si el token es incorrecto o falta, el servidor responderá con un error inmediato y **no encolará** el trabajo.
+Para enviar trabajos de impresión (`type: "ticket"`), es obligatorio incluir el campo `"auth_token"` coincidente con la
+configuración del servidor. Si el token es incorrecto o falta, el servidor responderá con un error inmediato y **no
+encolará** el trabajo.
 
 ```json
 {
@@ -445,25 +488,34 @@ Si el token es incorrecto o falta, el servidor responderá con un error inmediat
 
 ---
 
-## 🛡️ Seguridad y Límites
-
-### Autenticación
-
-Para enviar trabajos de impresión (`type: "ticket"`), es obligatorio incluir el campo `"auth_token"` coincidente con la
-configuración del servidor.
+## Seguridad y Límites
 
 ### Rate Limiting
 
 El servidor protege la cola de impresión limitando la velocidad de peticiones:
 
 - **Límite:** 30 trabajos por minuto por conexión WebSocket.
-- **Respuesta:** Si se excede, se recibe un mensaje de tipo `error` con el texto "Rate limit exceeded".
+- **Respuesta:** Si se excede, se recibe un mensaje de tipo `error` con el texto exacto:
+  `"Rate limit exceeded: please wait before submitting more jobs"`.
+
+### Límites y Consideraciones
+
+| Parámetro               | Valor  | Descripción                              |
+|-------------------------|--------|------------------------------------------|
+| Capacidad de cola       | 100    | Trabajos máximos en espera (por defecto) |
+| Rate Limit              | 30/min | Trabajos por minuto por conexión cliente |
+| Timeout de notificación | 5s     | Tiempo máximo para notificar resultado   |
+| Reconexión recomendada  | 3s     | Delay sugerido antes de reconectar       |
 
 ---
 
 ## Categorías de Error
 
-Los mensajes de error en logs siguen un formato prefijado:
+Los mensajes de error en logs y en las respuestas WebSocket de tipo `result` con `status: "error"` siguen un formato
+prefijado.
+
+> **💡 Nota para integración:** Los clientes pueden hacer un `split(":")` del mensaje de error para separar la categoría
+> técnica (ej. `VALIDATION`, `PRINTER`) de la descripción legible para el usuario.
 
 | Prefijo       | Descripción                       | Ejemplos                                       |
 |---------------|-----------------------------------|------------------------------------------------|
@@ -471,7 +523,7 @@ Los mensajes de error en logs siguen un formato prefijado:
 | `PRINTER:`    | Error de conexión con impresora   | Cannot connect - check if printer is installed |
 | `QR:`         | Error generando código QR         | Data cannot be empty                           |
 | `BARCODE:`    | Error en código de barras         | Symbology type is required                     |
-| `TABLE:`      | Error en renderizado de tabla     | Columns exceed paper width                     |
+| `TABLE:`      | Error en renderizado de tabla     | Columns were not defined                       |
 | `RAW:`        | Error en comando raw              | Blocked by safe_mode                           |
 | `IMAGE:`      | Error procesando imagen           | Invalid or corrupted base64 data               |
 | `COMMAND:`    | Error de comando desconocido      | Unknown command type                           |
@@ -550,10 +602,11 @@ class TicketClient {
 
     /**
      * Envía un documento a imprimir
-     * @param {Object} document - Objeto JSON con estructura de Poster (version, profile, commands)
+     * @param {Object} document - Objeto JSON con estructura de Poster
      * @param {string} [id] - ID opcional del trabajo
+     * @param {string} [auth_token] - Token de autenticación si el servidor lo requiere
      */
-    print(document, id = null) {
+    print(document, id = null, authToken = null) {
         if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
             this.callbacks.onError("No hay conexión con el servicio de impresión");
             return;
@@ -564,6 +617,10 @@ class TicketClient {
             id: id || `job-${Date.now()}`,
             datos: document
         };
+
+      if (authToken) {
+        payload.auth_token = authToken;
+      }
 
         this.socket.send(JSON.stringify(payload));
     }
@@ -604,14 +661,15 @@ import (
 	"encoding/json"
 	"log"
 
-	"nhooyr.io/websocket"
-	"nhooyr.io/websocket/wsjson"
+  "github.com/coder/websocket"
+  "github.com/coder/websocket/wsjson"
 )
 
 type Message struct {
-	Tipo  string          `json:"tipo"`
-	ID    string          `json:"id,omitempty"`
-	Datos json.RawMessage `json:"datos,omitempty"`
+  Tipo      string          `json:"tipo"`
+  ID        string          `json:"id,omitempty"`
+  Datos     json.RawMessage `json:"datos,omitempty"`
+  AuthToken string          `json:"auth_token,omitempty"`
 }
 
 type Response struct {
@@ -632,9 +690,10 @@ func main() {
 	// Enviar trabajo
 	doc := `{"version":"1.0","profile":{"model":"58mm PT-210"},"commands":[{"type":"beep","data":{"times":1}}]}`
 	msg := Message{
-		Tipo:  "ticket",
-		ID:    "go-job-001",
-		Datos: json.RawMessage(doc),
+      Tipo:      "ticket",
+      ID:        "go-job-001",
+      AuthToken: "tu-token-secreto", // Requerido si el servidor compiló con AuthToken
+      Datos:     json.RawMessage(doc),
 	}
 
 	if err := wsjson.Write(ctx, conn, msg); err != nil {
@@ -661,32 +720,6 @@ func main() {
 ```bash
 curl -s http://localhost:8766/health | jq .
 ```
-
----
-
-## Límites y Consideraciones
-
-| Parámetro                | Valor   | Descripción                                    |
-|--------------------------|---------|------------------------------------------------|
-| Capacidad de cola        | 100     | Trabajos máximos en espera                     |
-| Timeout de notificación  | 5s      | Tiempo máximo para notificar resultado         |
-| Reconexión recomendada   | 3s      | Delay sugerido antes de reconectar             |
-| Tamaño máximo de mensaje | ~10MB   | Limitado por memoria (imágenes base64)         |
-
-### Backpressure
-
-Cuando la cola está llena (100 trabajos), el servidor rechaza inmediatamente nuevos trabajos con un mensaje `error`:
-
-```json
-{
-  "tipo": "error",
-  "id": "job-xxx",
-  "status": "error",
-  "mensaje": "Queue full, please retry in a few seconds"
-}
-```
-
-**Recomendación:** Implementar retry con backoff exponencial (1s, 2s, 4s...).
 
 ---
 

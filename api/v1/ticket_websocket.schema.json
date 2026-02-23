@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://github.com/adcondev/ticket-daemon/api/v1/websocket.schema.json",
+  "$id": "https://github.com/adcondev/ticket-daemon/api/v1/ticket_websocket.schema.json",
   "title": "Ticket Daemon WebSocket Protocol",
   "description": "Schema for WebSocket message protocol between clients and Ticket Daemon server",
 
@@ -157,7 +157,9 @@
         "mensaje": {
           "type": "string",
           "description": "Human-readable message",
-          "examples": ["Connected to Ticket Daemon print server"]
+          "examples": [
+            "✅ Servidor respondiendo desde Ticket Daemon"
+          ]
         }
       },
       "additionalProperties": false
@@ -314,7 +316,7 @@
         "worker",
         "printers",
         "build",
-        "uptime_seconds"
+        "uptime"
       ],
       "properties": {
         "status": {
@@ -334,7 +336,7 @@
         "build": {
           "$ref": "#/definitions/BuildInfo"
         },
-        "uptime_seconds": {
+        "uptime": {
           "type": "integer",
           "description": "Service uptime in seconds",
           "minimum": 0
@@ -396,18 +398,17 @@
       "properties":  {
         "env": {
           "type": "string",
-          "enum": ["prod", "test"],
-          "description":  "Build environment"
+          "description": "Build environment (e.g., local, remote, prod)"
         },
         "date":  {
           "type": "string",
-          "description": "Build date (YYYY-MM-DD)",
-          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          "description": "Build date (YYYY-MM-DD) or 'unknown'",
+          "pattern": "^(unknown|\\d{4}-\\d{2}-\\d{2})$"
         },
         "time": {
           "type":  "string",
-          "description": "Build time (HH: MM:SS)",
-          "pattern": "^\\d{2}:\\d{2}:\\d{2}$"
+          "description": "Build time (HH:MM:SS) or 'unknown'",
+          "pattern": "^(unknown|\\d{2}:\\d{2}:\\d{2})$"
         }
       }
     },

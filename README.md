@@ -334,12 +334,12 @@ Audit events (login attempts, token rejections, rate limiting) are logged with `
 
 ## 📖 API Documentation
 
-| Document                                                            | Description                         |
-|---------------------------------------------------------------------|-------------------------------------|
-| [TICKET_DOCUMENT_V1.md](api/v1/TICKET_DOCUMENT_V1.md)               | Print document format specification |
-| [TICKET_WEBSOCKET_V1.md](api/v1/TICKET_WEBSOCKET_V1.md)             | WebSocket protocol specification    |
-| [ticket_document.schema.json](api/v1/ticket_document.schema.json)   | JSON Schema for document validation |
-| [ticket_websocket.schema.json](api/v1/ticket_websocket.schema.json) | JSON Schema for WebSocket messages  |
+| Document                                                                    | Description                         |
+|-----------------------------------------------------------------------------|-------------------------------------|
+| [TICKET_DOCUMENT_V1.md](../poster/api/v1/TICKET_DOCUMENT_V1.md)             | Print document format specification |
+| [TICKET_WEBSOCKET_V1.md](api/v1/TICKET_WEBSOCKET_V1.md)                     | WebSocket protocol specification    |
+| [ticket_document.schema.json](../poster/api/v1/ticket_document.schema.json) | JSON Schema for document validation |
+| [ticket_websocket.schema.json](api/v1/ticket_websocket.schema.json)         | JSON Schema for WebSocket messages  |
 
 ---
 

@@ -1,38 +1,41 @@
 # 🎫 Ticket Daemon
 
-# Ticket Service Daemon
+**A production-grade Windows Service that bridges web POS applications with thermal printers via WebSocket.**
 
-[![codecov](https://codecov.io/gh/adcondev/ticket-daemon/branch/main/graph/badge.svg)](https://codecov.io/gh/adcondev/ticket-daemon)
+<!-- ![Logo](URL) -->
+
 [![CI](https://github.com/adcondev/ticket-daemon/actions/workflows/ci.yml/badge.svg)](https://github.com/adcondev/ticket-daemon/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/adcondev/ticket-daemon/branch/main/graph/badge.svg)](https://codecov.io/gh/adcondev/ticket-daemon)
 [![Go Report Card](https://goreportcard.com/badge/github.com/adcondev/ticket-daemon)](https://goreportcard.com/report/github.com/adcondev/ticket-daemon)
 ![Language](https://img.shields.io/badge/Go-1.24+-00ADD8?style=flat&logo=go&logoColor=white)
 ![Platform](https://img.shields.io/badge/Platform-Windows-0078D6?style=flat&logo=windows&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-green?style=flat)
 ![WebSocket](https://img.shields.io/badge/Protocol-WebSocket-purple?style=flat)
 
-**Ticket Daemon** es un Servicio de Windows diseñado para entornos de producción retail. Actúa como un middleware
-robusto que conecta aplicaciones Web POS con impresoras térmicas físicas mediante WebSocket.
-
-El servicio gestiona la concurrencia de multiples terminales, encola trabajos para garantizar el orden de impresión y
-utiliza la librería **Poster** como motor de renderizado ESC/POS.
-
-## ✨ Características Principales
-
-- 🔌 **Servidor WebSocket** de alto rendimiento (puerto 8766 por defecto).
-- 🛡️ **Protección de Backpressure**: Cola con buffer (100 slots) y rechazo inmediato si se satura.
-- 🖨️ **Servicio Nativo Windows**: Integración completa con SCM (Service Control Manager).
-- 📝 **Logging Estructurado**: Rotación automática de archivos (5 MB) para mantenimiento cero.
-- 🖨️ **Motor Poster**: Soporte avanzado para texto, códigos de barras, QR e imágenes.
-- 🔐 **Seguridad Dual**: Protección de Dashboard mediante Login, validación de Token y limitador de peticiones para
-  trabajos de impresión vía API.
+Ticket Daemon is a Windows Service designed for production retail environments. It acts as a robust middleware that
+connects Web POS applications with physical thermal printers via WebSocket. The service manages concurrency from
+multiple terminals, queues jobs to guarantee print order, and uses the **Poster** library as the ESC/POS rendering
+engine.
 
 ---
 
-## 🏗️ Arquitectura del Sistema
+## ✨ Features
 
-### Estructura de Componentes
+- 🔌 **WebSocket Server** — High-performance bidirectional communication on port 8766
+- 🛡️ **Backpressure Protection** — Buffered queue (50–100 slots) with immediate rejection on saturation
+- 🖨️ **Native Windows Service** — Full integration with Service Control Manager (SCM)
+- 📝 **Structured Logging** — Automatic file rotation (5 MB), filtered verbosity, and audit trail
+- 🎫 **Poster Engine** — 11 command types: text, image, barcode, QR, table, separator, feed, cut, raw, pulse, beep
+- 🔐 **Dual Security** — Bcrypt-based dashboard login with brute-force lockout + per-message token validation + rate
+  limiting (30 jobs/min per client)
+- 🖥️ **Embedded Dashboard** — Diagnostic HTML/JS UI bundled into the single binary via `go:embed`
+- 🔍 **Printer Discovery** — Auto-detection of installed printers via Windows API with thermal vs. virtual classification
 
-El siguiente diagrama ilustra como el servicio envuelve los servidores HTTP/WS y coordina el flujo hacia el hardware.
+---
+
+## 🏗️ Architecture
+
+### System Components
 
 ```mermaid
 graph TD
@@ -40,131 +43,109 @@ graph TD
     classDef data fill:#fff3e0,stroke:#e65100,stroke-width:2px,color:#000;
     classDef hw fill:#f3e5f5,stroke:#4a148c,stroke-width:2px,color:#000;
 
-    subgraph Host["Host del Servicio Windows"]
+    subgraph Host["Windows Service Host"]
         direction TB
-        Service[Wrapper del Servicio]:::go -->|Init/Start| HTTP[Servidor HTTP]:::go
-        Service -->|Start/Stop| Worker[Worker de Impresion]:::go
-        HTTP -->|/ws| WSServer[Handler WebSocket]:::go
+        Service["Wrapper svc.Service<br/>daemon.go"]:::go -->|Init/Start| HTTP["HTTP Server<br/>+ Auth Manager"]:::go
+        Service -->|Start/Stop| Worker["Print Worker<br/>processor.go"]:::go
+        HTTP -->|"/ws"| WSServer["WebSocket Handler<br/>server.go"]:::go
+        HTTP -->|"/health"| Health["Health Endpoint"]:::go
+        HTTP -->|"/"| Dashboard["Dashboard<br/>index.html"]:::go
+        HTTP -->|"/login"| Login["Login Page<br/>auth.go"]:::go
     end
 
-    subgraph Flow["Flujo de Datos"]
+    subgraph Flow["Data Flow"]
         direction TB
-        Client[Cliente Web POS]:::data <-->|JSON Messages| WSServer
-        WSServer -->|Push Job| Queue[Canal Buffer 100]:::data
+        Client["Web POS Clients"]:::data <-->|JSON Messages| WSServer
+        WSServer -->|Rate Limit + Token Check| RateLimit["Rate Limiter<br/>rate_limit.go"]:::data
+        RateLimit -->|Push Job| Queue["Buffered Channel<br/>cap=50-100"]:::data
         Queue -->|Pop Job| Worker
     end
 
-    subgraph Hardware["Integracion de Hardware"]
+    subgraph Hardware["Hardware Integration"]
         direction TB
-        Worker -->|Execute| PosterLib[Libreria Poster]:::hw
-        PosterLib -->|Bytes ESC/POS| Spooler[Spooler de Windows]:::hw
-        Spooler -->|USB/Serial/LPT| Printer[Impresora Termica]:::hw
+        Worker -->|Execute| PosterLib["Poster Library<br/>ESC/POS Composer"]:::hw
+        PosterLib -->|Raw Bytes| Spooler["Windows Print Spooler"]:::hw
+        Spooler -->|USB / Serial| Printer["Thermal Printer"]:::hw
     end
 ```
 
-### Modelo de Concurrencia (Fan-In)
-
-El sistema utiliza un patron de **Fan-In** con un `Select` no bloqueante. Esto permite manejar multiples conexiones
-simultáneas sin bloquear el hilo principal si la impresora es lenta.
-
-```mermaid
-graph TB
-    classDef client fill: #e8f5e9, stroke: #2e7d32, stroke-width: 2px;
-    classDef logic fill: #fff9c4, stroke: #fbc02d, stroke-width: 2px;
-    classDef crit fill: #ffebee, stroke: #c62828, stroke-width: 2px;
-    classDef core fill: #e3f2fd, stroke: #1565c0, stroke-width: 2px;
-    subgraph Clients["Capa HTTP/WS Concurrente"]
-        C1[Cliente POS 1]:::client --> H1[Goroutine Handler 1]:::core
-        C2[Cliente POS 2]:::client --> H2[Goroutine Handler 2]:::core
-        C3[Cliente POS 3]:::client --> H3[Goroutine Handler 3]:::core
-    end
-
-    subgraph Sync["Sincronizacion"]
-        direction TB
-        H1 & H2 & H3 --> Select{Select Non-blocking}:::logic
-        Select -- " Default Lleno " --> Overflow[Error: Cola Llena]:::crit
-        Select -- " Case Send " --> Channel[Canal cap=100]:::core
-    end
-
-    subgraph Process["Procesamiento Serial"]
-        Channel --> WLoop[Worker Loop]:::core
-        WLoop --> Mutex[Poster Executor]:::core
-        Mutex --> Hardware[Hardware Fisico]:::crit
-    end
-```
-
-### Ciclo de Vida del Mensaje
+### Message Lifecycle
 
 ```mermaid
 sequenceDiagram
-    participant C as Cliente Web
+    participant C as Web Client
     participant H as WS Handler
-    participant Q as Cola Canal
+    participant Q as Channel Queue
     participant W as Worker
     participant P as Poster Engine
-    Note over C, H: Conexion establecida ws://...
-    C ->> H: {"tipo":"ticket", "datos":{...}}
+    Note over C, H: Connection established ws://...
+    C ->>H: {"tipo":"ticket", "datos":{...}}
 
     rect rgb(240, 248, 255)
         Note right of H: server.go
-        H ->> H: Validar JSON
+        H ->>H: Rate Limit + Token Validation
+        H ->>H: Validate JSON
 
-        alt Cola Llena (Select Default)
-            H -->> C: {"tipo":"error", "mensaje":"Cola llena, reintente"}
-        else Encolado Exitoso
-            H ->> Q: Push PrintJob
-            H -->> C: {"tipo":"ack", "status":"queued", "pos": 5}
+        alt Queue Full (Select Default)
+            H -->>C: {"tipo":"error", "mensaje":"Queue full"}
+        else Queued Successfully
+            H ->>Q: Push PrintJob
+            H -->>C: {"tipo":"ack", "status":"queued", "pos": 5}
         end
     end
 
     rect rgb(255, 248, 240)
         Note right of W: processor.go
-        Q ->> W: Pop PrintJob
-        W ->> P: Execute(Document)
+        Q ->>W: Pop PrintJob
+        W ->>P: Execute(Document)
 
-        alt Exito
-            P -->> W: nil
-            W ->> H: NotifyClient(Success)
-            H -->> C: {"tipo":"result", "status":"success"}
+        alt Success
+            P -->>W: nil
+            W ->>H: NotifyClient(Success)
+            H -->>C: {"tipo":"result", "status":"success"}
         else Error
-            P -->> W: error
-            W ->> H: NotifyClient(Error)
-            H -->> C: {"tipo":"result", "status":"error", "mensaje":"... "}
+            P -->>W: error
+            W ->>H: NotifyClient(Error)
+            H -->>C: {"tipo":"result", "status":"error", "mensaje":"..."}
         end
     end
 ```
 
 ---
 
-## 📡 Protocolo WebSocket
+## 📡 WebSocket Protocol
 
 ### Endpoints
 
-| Endpoint                       | Descripcion            |
-|--------------------------------|------------------------|
-| `ws://localhost:8766/ws`       | Conexion WebSocket     |
-| `http://localhost:8766/health` | Health check (JSON)    |
-| `http://localhost:8766/`       | Cliente de prueba HTML |
+| Endpoint                       | Description          |
+|--------------------------------|----------------------|
+| `ws://localhost:8766/ws`       | WebSocket connection |
+| `http://localhost:8766/health` | Health check (JSON)  |
+| `http://localhost:8766/`       | Diagnostic dashboard |
+| `http://localhost:8766/login`  | Dashboard login      |
 
-### Tipos de Mensaje
+### Message Types
 
-| Direccion | `tipo`         | Descripcion                  |
-|-----------|----------------|------------------------------|
-| C -> S    | `ticket`       | Enviar trabajo de impresion  |
-| C -> S    | `status`       | Solicitar estado de la cola  |
-| C -> S    | `ping`         | Ping al servidor             |
-| C -> S    | `get_printers` | Listar impresoras instaladas |
-| S -> C    | `ack`          | Trabajo aceptado y encolado  |
-| S -> C    | `result`       | Trabajo completado/fallido   |
-| S -> C    | `error`        | Error de validacion/cola     |
-| S -> C    | `printers`     | Lista de impresoras          |
+| Direction | `tipo`         | Description                       |
+|-----------|----------------|-----------------------------------|
+| C → S     | `ticket`       | Submit print job (+ `auth_token`) |
+| C → S     | `status`       | Query queue status                |
+| C → S     | `ping`         | Ping server                       |
+| C → S     | `get_printers` | List installed printers           |
+| S → C     | `info`         | Welcome / info messages           |
+| S → C     | `ack`          | Job accepted and queued           |
+| S → C     | `result`       | Job completed or failed           |
+| S → C     | `error`        | Validation / queue error          |
+| S → C     | `pong`         | Ping response                     |
+| S → C     | `printers`     | Printer list response             |
 
-### Ejemplo de Payload
+### Example Payload
 
 ```json
 {
   "tipo": "ticket",
-  "id": "pos1-20260109-001",
+  "id": "pos1-20260115-001",
+  "auth_token": "your-secret-token",
   "datos": {
     "version": "1.0",
     "profile": {
@@ -176,318 +157,211 @@ sequenceDiagram
         "type": "text",
         "data": {
           "content": {
-            "text": "TICKET DE PRUEBA",
+            "text": "TEST TICKET",
             "align": "center",
-            "content_style": {
-              "bold": true,
-              "size": "2x2"
-            }
+            "content_style": { "bold": true, "size": "2x2" }
           }
         }
       },
-      {
-        "type": "cut",
-        "data": {
-          "mode": "partial"
-        }
-      }
+      { "type": "cut", "data": { "mode": "partial" } }
     ]
   }
 }
 ```
 
-### Descubrimiento de Impresoras
+---
 
-El servicio detecta automáticamente las impresoras instaladas en Windows al iniciar y expone esta información via
-WebSocket y HTTP.
+## 🔐 Security (Build-Time Configuration)
 
-**Mensaje WebSocket:**
+Credentials are injected at compile time via `-ldflags` — no runtime config files needed for secrets.
 
-Petición para obtener impresoras:
-
-```json
-{
-  "tipo": "get_printers"
-}
-```
-
-Respuesta del servidor:
-
-```json
-{
-  "tipo": "printers",
-  "status": "ok",
-  "printers": [
-    {
-      "name": "58mm PT-210",
-      "port": "USB001",
-      "driver": "Generic / Text Only",
-      "status": "ready",
-      "is_default": true,
-      "is_virtual": false,
-      "printer_type": "thermal"
-    }
-  ],
-  "summary": {
-    "status": "ok",
-    "detected_count": 5,
-    "thermal_count": 1,
-    "default_name": "58mm PT-210"
-  }
-}
-```
-
-**Health Check (`/health`):**
-
-```json
-{
-  "status": "ok",
-  "printers": {
-    "status": "ok",
-    "detected_count": 5,
-    "thermal_count": 1,
-    "default_name": "58mm PT-210"
-  }
-  // ... other fields
-}
-```
-
-| Estado Printers | Significado                                    |
-|-----------------|------------------------------------------------|
-| `ok`            | Al menos una impresora térmica detectada       |
-| `warning`       | Hay impresoras físicas pero ninguna es térmica |
-| `error`         | No hay impresoras físicas instaladas           |
-
-> **Nota:** El estado `ready` refleja el último estado conocido del Windows Spooler. Para impresoras USB/Serial, esto
-> puede no reflejar si están físicamente conectadas en tiempo real.
+| Variable           | Description                               | Example                              |
+|--------------------|-------------------------------------------|--------------------------------------|
+| `AuthToken`        | Token for WebSocket job submissions       | `"my-secret-token"`                  |
+| `PasswordHashB64`  | Bcrypt hash (base64) for dashboard login  | `"JDJhJDEwJEx6..."` (generate yours) |
+| `BuildEnvironment` | Environment profile (`local` or `remote`) | `"local"` or `"remote"`              |
+| `ServiceName`      | Windows service name                      | `"R2k_TicketServicio"`               |
 
 ---
 
-## 🔐 Configuración de Seguridad (Build-Time)
+## 🚀 Getting Started
 
-Este servicio no usa archivos de configuración externos por seguridad. Las credenciales se inyectan al compilar:
+### Prerequisites
 
-1. **Dashboard Password:** Requiere un hash Bcrypt en base64.
-2. **Auth Token:** Token simple para validar los WebSockets.
+- **Go 1.24+** — [Download](https://go.dev/dl/)
+- **Task (go-task)** — [Installation](https://taskfile.dev/installation/)
+- **Windows 10/11** or Windows Server
+- A thermal POS printer installed in Windows
 
-Ver `Taskfile.yml` para ejemplos de compilación.
-
----
-
-## ⚙️ Configuración y Compilación
-
-Este servicio no utiliza archivos de configuración en tiempo de ejecución (`.env` o `.yaml`) por seguridad. Las
-credenciales se inyectan directamente en el binario durante la compilación.
-
-### Variables de Build (LDFLAGS)
-
-Las variables residen en el paquete `github.com/adcondev/ticket-daemon/internal/config`:
-
-| Variable Go        | Descripción                                   | Ejemplo de Valor                    |
-|--------------------|-----------------------------------------------|-------------------------------------|
-| `AuthToken`        | Token para validar trabajos vía WebSocket     | `"mi-token-secreto"`                |
-| `PasswordHashB64`  | Hash Bcrypt (base64) para acceso al Dashboard | `"Jd8a..."` (generado externamente) |
-| `BuildEnvironment` | Define timeouts y comportamiento de logs      | `"local"` o `"remote"`              |
-
-### Ejemplo de Compilación Manual
-
-Para generar un binario seguro:
+### Installation
 
 ```powershell
-# 1. Generar hash del password (usando herramienta auxiliar o externa)
-# ...
+# Clone the repository
+git clone https://github.com/adcondev/ticket-daemon.git
+cd ticket-daemon
 
-# 2. Compilar inyectando variables
-go build -ldflags "-s -w \
-  -X github.com/adcondev/ticket-daemon/internal/config.AuthToken=mi-token-secreto 
-  -X '[github.com/adcondev/ticket-daemon/internal/config.PasswordHashB64=HASH_BASE64_AQUI](https://github.com/adcondev/ticket-daemon/' `
-  -X '[github.com/adcondev/ticket-daemon/internal/config.BuildEnvironment=local](https://github.com/adcondev/ticket-dae'" `
-  -o TicketServicio.exe ./cmd/TicketServicio
+# Clone the Poster library (sibling directory)
+git clone https://github.com/adcondev/poster.git ../poster
 
+# Copy and configure environment variables
+copy .env.example .env
+# Edit .env with your token and password hash
 ```
 
----
-
-## 🚀 Inicio Rápido
-
-### Prerrequisitos
-
-- **Go 1.24+**
-- **Task** (go-task) - [Instalación](https://taskfile.dev/installation/)
-- Windows 10/11 o Windows Server
-
-### Comandos Comunes (con Task)
+### Usage
 
 ```powershell
-# Ver todos los comandos disponibles
-task
+# Build the service binary
+task build
 
-# Compilar y ejecutar en modo consola (desarrollo)
+# Build and run immediately in console mode
 task run
 
-# Compilar ejecutable standalone (doble-clic para ejecutar)
-task build-console
-
-# Instalar como Servicio de Windows (requiere Admin)
-task install
-
-# Ver logs en tiempo real
-task logs
-
-# Abrir dashboard de diagnostico
-task open
-
-# Verificar estado del servicio
-task status
+# Clean build artifacts
+task clean
 ```
 
-### Ejecutable Standalone (Sin Task)
+The service starts on `http://localhost:8766` by default.  
+Open the dashboard at `http://localhost:8766/` and the WebSocket at `ws://localhost:8766/ws`.
 
-Si prefieres distribuir solo el `.exe`:
+### Manual Build (without Task)
 
 ```powershell
-# 1. Compilar
-task build-console
+go build -ldflags "-s -w
+  -X 'github.com/adcondev/ticket-daemon/internal/config.AuthToken=your-token'
+  -X 'github.com/adcondev/ticket-daemon/internal/config.PasswordHashB64=YOUR_HASH'
+  -X 'github.com/adcondev/ticket-daemon/internal/config.BuildEnvironment=local'
+  -X 'github.com/adcondev/ticket-daemon/internal/config.ServiceName=R2k_TicketServicio'" `
+  -o bin/TicketServicio.exe ./cmd/TicketServicio
 
-# 2. El ejecutable queda en: 
-#    bin/TicketDaemon_Console.exe
-
-# 3. Doble-clic para ejecutar, o desde terminal:
-.\bin\TicketDaemon_Console.exe
-
-# 4. Abrir navegador en: http://localhost:8766
+# Run in console mode
+.\bin\TicketServicio.exe -console
 ```
 
 ---
 
-## 📂 Estructura del Proyecto
+## 📂 Project Structure
 
 ```
 ticket-daemon/
+├── .github/
+│   ├── workflows/
+│   │   ├── ci.yml                # CI pipeline (test, lint, build, benchmarks)
+│   │   ├── codeql.yml            # CodeQL security analysis (SAST)
+│   │   ├── pr-automation.yml     # Auto-labeling, conflict detection, auto-assign
+│   │   └── pr-status-check.yml   # Weekly PR status dashboard
+│   ├── codeql-config.yml         # CodeQL query configuration
+│   └── pull_request_template.md  # PR template
+│
 ├── api/
 │   └── v1/
-│       ├── DOCUMENT_V1.md        # Especificacion formato documento
-│       ├── WEBSOCKET_V1.md       # Especificacion protocolo WebSocket
-│       ├── document.schema.json  # JSON Schema del documento
-│       └── websocket.schema.json # JSON Schema mensajes WS
+│       ├── TICKET_DOCUMENT_V1.md       # Document format specification
+│       ├── TICKET_WEBSOCKET_V1.md      # WebSocket protocol specification
+│       ├── ticket_document.schema.json # JSON Schema (document)
+│       └── ticket_websocket.schema.json# JSON Schema (WebSocket messages)
 │
 ├── cmd/
 │   └── TicketServicio/
-│       └── ticket_servicio.go    # Punto de entrada (main)
-│
-├── examples/
-│   └── json/                     # Ejemplos de documentos JSON
-│       ├── showcase.json         # Demo de todos los comandos
-│       └── table_showcase.json   # Ejemplos de tablas
+│       └── main.go               # Entry point (service + console mode)
 │
 ├── internal/
 │   ├── assets/
-│   │   ├── embed.go              # Go embed para archivos web
-│   │   └── web/                  # Dashboard HTML/CSS/JS embebido
+│   │   └── web/                  # Embedded dashboard (HTML/CSS/JS)
+│   │       ├── index.html        # Dashboard (Go template with token injection)
+│   │       ├── login.html        # Login page
+│   │       ├── css/dashboard.css
+│   │       └── js/               # config.js, main.js, state.js, ui.js, websocket.js
+│   │
+│   ├── auth/
+│   │   └── auth.go               # Session management, bcrypt login, brute-force protection
+│   │
+│   ├── config/
+│   │   └── config.go             # Environment config, ldflags variables
 │   │
 │   ├── daemon/
-│   │   ├── program.go            # Wrapper svc.Service y Configuracion
-│   │   ├── logger.go             # Logging filtrado con rotacion
-│   │   ├── daemon_types.go       # Tipos de respuesta Health
-│   │   └── printer_discovery.go  # Descubrimiento de impresoras Windows
+│   │   ├── daemon.go             # svc.Service wrapper, HTTP mux, route setup
+│   │   ├── daemon_types.go       # HealthResponse, QueueStatus, WorkerStatus types
+│   │   ├── logger.go             # Filtered logging with 5 MB rotation
+│   │   └── printer_discovery.go  # Cached printer discovery via Windows API
 │   │
-│   ├── printer/
-│   │   └── printer_types.go      # Tipos compartidos de impresora
+│   ├── posprinter/
+│   │   └── types.go              # Shared DTOs (PrinterSummary, PrinterDetailDTO)
 │   │
 │   ├── server/
-│   │   ├── server.go             # Logica WebSocket y Cola (Select)
-│   │   └── clients.go            # Registro Thread-Safe de clientes
+│   │   ├── server.go             # WebSocket handler, job queue, message routing
+│   │   ├── clients.go            # Thread-safe client registry (sync.RWMutex)
+│   │   └── rate_limit.go         # Per-client sliding-window rate limiter
 │   │
 │   └── worker/
-│       └── processor.go          # Integracion con libreria Poster
+│       └── processor.go          # Print job executor, Poster library integration
 │
-├── go.mod
-├── Taskfile.yml                  # Automatizacion de tareas
+├── embed.go                      # go:embed directive for web assets
+├── go.mod / go.sum
+├── Taskfile.yml                  # Build automation (build, run, clean)
+├── .golangci.yml                 # Linter configuration (16+ linters)
+├── .env.example                  # Environment variable template
+├── LEARNING.md                   # Technical summary for portfolio/CV
 ├── README.md
-└── LEARNING.md                   # Resumen tecnico para portfolio
+└── LICENSE                       # MIT
 ```
 
 ---
 
-## 📝 Logs y Auditoria
+## 📝 Logging & Audit
 
-Los logs se escriben en `%PROGRAMDATA%` y rotan automáticamente al superar 5 MB.
+Logs are written to `%PROGRAMDATA%` and rotate automatically when exceeding 5 MB.
 
-| Ambiente     | Ruta Tipica                                                              |
-|--------------|--------------------------------------------------------------------------|
-| **`remote`** | `C:\ProgramData\R2k_TicketServicio_Remote\R2k_TicketServicio_Remote.log` |
-| **`local`**  | `C:\ProgramData\TicketServicioTest_Local\TicketServicioTest_Local.log`   |
+| Environment  | Default Path                                               |
+|--------------|------------------------------------------------------------|
+| **`remote`** | `C:\ProgramData\R2k_TicketServicio\R2k_TicketServicio.log` |
+| **`local`**  | `C:\ProgramData\R2k_TicketServicio\R2k_TicketServicio.log` |
 
-### Ver Logs
-
-```powershell
-# Ultimas 100 lineas
-task logs
-
-# O directamente:
-Get-Content "C:\ProgramData\TicketServicioTest_Local\TicketServicioTest_Local.log" -Tail 100 -Wait
-```
+Audit events (login attempts, token rejections, rate limiting) are logged with `[AUDIT]` prefix.
 
 ---
 
-## 🔧 Solución de Problemas
+## 🔧 Troubleshooting
 
-### El servicio no inicia
-
-```powershell
-# Verificar estado
-sc query TicketServicioTest
-
-# Ver logs de error
-task logs
-
-# Reinstalar
-task uninstall
-task install
-```
-
-### No se puede conectar por WebSocket
-
-1. Verificar que el servicio esté corriendo: `task status`
-2. Verificar firewall para puerto 8766
-3. Probar health check: `task health`
-
-### La impresora no imprime
-
-1. Verificar nombre exacto en `profile.model` (debe coincidir con Windows)
-2. Verificar que Print Spooler este activo: `Get-Service Spooler`
-3. Probar impresión directa desde Windows
+| Problem                 | Solution                                                                         |
+|-------------------------|----------------------------------------------------------------------------------|
+| Service won't start     | Check logs at `%PROGRAMDATA%\<ServiceName>\`, verify port 8766 is available      |
+| WebSocket won't connect | Verify service is running, check firewall for port 8766, test `/health` endpoint |
+| Printer not printing    | Ensure `profile.model` matches the exact Windows printer name, verify Spooler    |
+| Dashboard login fails   | Ensure `TICKET_DASHBOARD_HASH` was set at build time, check for IP lockout       |
+| Rate limit errors       | Reduce submission frequency (max 30 jobs/min per client)                         |
 
 ---
 
-## 📄 Licencia
+## 📖 API Documentation
 
-MIT © adcondev - RED 2000
-
----
-
-## 📖 Documentación de la API
-
-Este proyecto incluye documentación detallada del protocolo y formato de documentos:
-
-| Documento                                             | Descripción                                          |
-|-------------------------------------------------------|------------------------------------------------------|
-| [DOCUMENT_V1.md](api/v1/DOCUMENT_V1.md)               | Especificación del formato de documento de impresión |
-| [WEBSOCKET_V1.md](api/v1/WEBSOCKET_V1.md)             | Especificación del protocolo WebSocket               |
-| [document.schema.json](api/v1/document.schema.json)   | JSON Schema para validación de documentos            |
-| [websocket.schema.json](api/v1/websocket.schema.json) | JSON Schema para mensajes WebSocket                  |
-
-### Ejemplos de Uso
-
-La carpeta `examples/json/` contiene documentos de ejemplo listos para usar:
-
-- `showcase.json` - Demostración de todos los tipos de comandos
-- `table_showcase.json` - Ejemplos de tablas con diferentes configuraciones
-- `ticket_service_test.json` - Ticket completo con impuestos y QR
+| Document                                                            | Description                         |
+|---------------------------------------------------------------------|-------------------------------------|
+| [TICKET_DOCUMENT_V1.md](api/v1/TICKET_DOCUMENT_V1.md)               | Print document format specification |
+| [TICKET_WEBSOCKET_V1.md](api/v1/TICKET_WEBSOCKET_V1.md)             | WebSocket protocol specification    |
+| [ticket_document.schema.json](api/v1/ticket_document.schema.json)   | JSON Schema for document validation |
+| [ticket_websocket.schema.json](api/v1/ticket_websocket.schema.json) | JSON Schema for WebSocket messages  |
 
 ---
 
-## 🔗 Recursos Relacionados
+## 🤝 Contributing
 
-- [Poster Library](https://github.com/adcondev/poster) - Motor de impresión ESC/POS
-- [Task - Automatización](https://taskfile.dev/)
+Contributions are welcome! Please follow these guidelines:
+
+1. Fork the repository and create a feature branch
+2. PR titles must follow [Conventional Commits](https://www.conventionalcommits.org/) format (e.g.,
+   `feat(server): add new endpoint`)
+3. All PRs require passing CI checks (tests, lint, build)
+4. Fill out the PR template provided
+
+---
+
+## 📄 License
+
+MIT © Adrián Constante
+
+---
+
+## 🔗 Related Resources
+
+- [Poster Library](https://github.com/adcondev/poster) — ESC/POS rendering engine
+- [Task - Build Automation](https://taskfile.dev/)

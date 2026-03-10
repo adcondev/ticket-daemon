@@ -73,7 +73,10 @@ func (p *Program) Start() error {
 	p.printerDiscovery.LogStartupDiagnostics()
 
 	// Initialize WebSocket server
-	p.wsServer = server.NewServer(server.Config{QueueSize: cfg.QueueCapacity}, p.printerDiscovery)
+	p.wsServer = server.NewServer(server.Config{
+		QueueSize:      cfg.QueueCapacity,
+		AllowedOrigins: cfg.AllowedOrigins,
+	}, p.printerDiscovery)
 
 	// Initialize print worker
 	p.printWorker = worker.NewWorker(

@@ -4,6 +4,7 @@ package config
 import (
 	"log"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -22,6 +23,9 @@ var (
 	AuthToken = ""
 	// ServerPort is the default port for the service, can be overridden by environment config.
 	ServerPort = "8766"
+	// AllowedOrigins is a comma-separated list of allowed origins injected via ldflags.
+	// Example: "https://pos.example.com,http://localhost:*"
+	AllowedOrigins = ""
 )
 
 // Environment holds environment-specific settings
@@ -44,6 +48,9 @@ type Environment struct {
 
 	// Impresora
 	DefaultPrinter string
+
+	// Security
+	AllowedOrigins []string
 }
 
 // LogPath returns the full log file path for this environment.
@@ -64,6 +71,8 @@ var environments = map[string]Environment{
 		QueueCapacity:  50,
 		Verbose:        false,
 		DefaultPrinter: "",
+		// By default, restrict to localhost and file (Electron) for security
+		AllowedOrigins: []string{"http://localhost:*", "https://localhost:*", "file://*"},
 	},
 	"local": {
 		Name:           "LOCAL",
@@ -75,14 +84,23 @@ var environments = map[string]Environment{
 		QueueCapacity:  50,
 		Verbose:        true,
 		DefaultPrinter: "58mm PT-210",
+		// Allow all in local dev mode for convenience, but can be overridden
+		AllowedOrigins: []string{"*"},
 	},
 }
 
 // GetEnvironment returns config for the specified environment.
 func GetEnvironment(env string) Environment {
-	if cfg, ok := environments[env]; ok {
-		return cfg
+	cfg, ok := environments[env]
+	if !ok {
+		log.Printf("[!] Unknown environment '%s', defaulting to 'local'", env)
+		cfg = environments["local"]
 	}
-	log.Printf("[!] Unknown environment '%s', defaulting to 'local'", env)
-	return environments["local"]
+
+	// Override allowed origins from ldflags if provided
+	if AllowedOrigins != "" {
+		cfg.AllowedOrigins = strings.Split(AllowedOrigins, ",")
+	}
+
+	return cfg
 }

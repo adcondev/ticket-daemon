@@ -139,7 +139,9 @@ func (p *Program) Start() error {
 
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("Access-Control-Allow-Origin", "*")
-		_ = json.NewEncoder(w).Encode(response)
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			log.Printf("[HTTP] ⚠️ Failed to encode health response: %v", err)
+		}
 	}
 
 	// Create HTTP mux with auth boundaries

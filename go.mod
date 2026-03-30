@@ -1,6 +1,6 @@
 module github.com/adcondev/ticket-daemon
 
-go 1.24.6
+go 1.25.0
 
 require (
 	github.com/adcondev/poster v0.0.0
@@ -17,9 +17,9 @@ require (
 	github.com/yeqown/go-qrcode/v2 v2.2.5 // indirect
 	github.com/yeqown/go-qrcode/writer/standard v1.3.0 // indirect
 	github.com/yeqown/reedsolomon v1.0.0 // indirect
-	golang.org/x/image v0.34.0 // indirect
+	golang.org/x/image v0.38.0 // indirect
 	golang.org/x/sys v0.41.0 // indirect
-	golang.org/x/text v0.34.0 // indirect
+	golang.org/x/text v0.35.0 // indirect
 )
 
 replace github.com/adcondev/poster => ../poster

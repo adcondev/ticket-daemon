@@ -69,7 +69,7 @@ func (p *Program) Start() error {
 	// Initialize auth manager (bound to service context for clean shutdown)
 	p.authMgr = auth.NewManager(p.ctx)
 
-	p.printerDiscovery = NewPrinterDiscovery()
+	p.printerDiscovery = NewPrinterDiscovery(cfg.PrinterCacheTTL)
 	p.printerDiscovery.LogStartupDiagnostics()
 
 	// Initialize WebSocket server

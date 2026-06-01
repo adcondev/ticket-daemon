@@ -110,8 +110,8 @@ func TestClientRegistry_Concurrency(t *testing.T) {
 			defer wg.Done()
 			_ = registry.Contains(&conns[i])
 			if i%10 == 0 {
-				registry.ForEach(func(c *websocket.Conn) {})
-				registry.Broadcast(func(c *websocket.Conn) error { return nil })
+				registry.ForEach(func(_ *websocket.Conn) {})
+				registry.Broadcast(func(_ *websocket.Conn) error { return nil })
 			}
 		}(i)
 	}

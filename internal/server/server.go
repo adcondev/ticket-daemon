@@ -18,6 +18,7 @@ import (
 	"github.com/adcondev/poster/pkg/connection"
 	"github.com/adcondev/ticket-daemon/internal/config"
 	"github.com/adcondev/ticket-daemon/internal/posprinter"
+	"github.com/adcondev/ticket-daemon/internal/utils"
 )
 
 const maxJobsPerMinute = 30
@@ -46,7 +47,6 @@ type Message struct {
 	Tipo  string          `json:"tipo"`
 	ID    string          `json:"id,omitempty"`
 	Datos json.RawMessage `json:"datos,omitempty"`
-	//nolint:gosec // Required JSON key for client payload
 	AuthToken string `json:"auth_token,omitempty"`
 }
 
@@ -188,7 +188,7 @@ func (s *Server) handleTicket(ctx context.Context, conn *websocket.Conn, msg *Me
 	// ── RATE LIMIT ────────────────────────────────────────
 	clientAddr := fmt.Sprintf("%p", conn) // Using pointer address as client identifier
 	if !s.jobLimiter.Allow(clientAddr) {
-		log.Printf("[AUDIT] JOB_RATE_LIMITED | client=%s", clientAddr)
+		log.Printf("[AUDIT] JOB_RATE_LIMITED | client=%s", utils.SanitizeLog(clientAddr))
 		s.sendError(ctx, conn, jobID, "Rate limit exceeded: please wait before submitting more jobs")
 		return
 	}
@@ -197,7 +197,7 @@ func (s *Server) handleTicket(ctx context.Context, conn *websocket.Conn, msg *Me
 	if config.AuthToken != "" {
 		token := msg.AuthToken
 		if token != config.AuthToken {
-			log.Printf("[AUDIT] JOB_REJECTED | reason=invalid_token | client=%s", clientAddr)
+			log.Printf("[AUDIT] JOB_REJECTED | reason=invalid_token | client=%s", utils.SanitizeLog(clientAddr))
 			s.sendError(ctx, conn, jobID, "Invalid or missing auth token")
 			return
 		}

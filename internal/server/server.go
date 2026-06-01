@@ -46,7 +46,6 @@ type Message struct {
 	Tipo  string          `json:"tipo"`
 	ID    string          `json:"id,omitempty"`
 	Datos json.RawMessage `json:"datos,omitempty"`
-	//nolint:gosec // Required JSON key for client payload
 	AuthToken string `json:"auth_token,omitempty"`
 }
 

@@ -133,7 +133,7 @@ func (p *Program) Start() error {
 			Uptime: int(time.Since(p.startTime).Seconds()),
 		}
 
-		if response.Printers.Status == "error" {
+		if response.Printers.Status == StatusError {
 			response.Status = "degraded"
 		}
 
@@ -318,7 +318,6 @@ func serveDashboard(tmpl *template.Template) http.HandlerFunc {
 			return
 		}
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		//nolint:gosec // False positive: passing token to internal template
 		data := struct{ AuthToken string }{AuthToken: config.AuthToken}
 		if err := tmpl.Execute(w, data); err != nil {
 			log.Printf("[X] Error rendering dashboard: %v", err)

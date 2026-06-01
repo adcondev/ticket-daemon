@@ -56,7 +56,7 @@ func (pd *PrinterDiscovery) GetPrinters(forceRefresh bool) ([]connection.Printer
 func (pd *PrinterDiscovery) GetSummary() posprinter.Summary {
 	printers, err := pd.GetPrinters(false)
 	if err != nil {
-		return posprinter.Summary{Status: "error", DetectedCount: 0}
+		return posprinter.Summary{Status: StatusError, DetectedCount: 0}
 	}
 
 	thermal := connection.FilterThermalPrinters(printers)
@@ -74,7 +74,7 @@ func (pd *PrinterDiscovery) GetSummary() posprinter.Summary {
 	if len(thermal) == 0 && len(physical) > 0 {
 		status = "warning"
 	} else if len(physical) == 0 {
-		status = "error"
+		status = StatusError
 	}
 
 	return posprinter.Summary{

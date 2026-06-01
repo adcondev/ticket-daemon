@@ -19,6 +19,7 @@ import (
 	embed "github.com/adcondev/ticket-daemon"
 	"github.com/adcondev/ticket-daemon/internal/auth"
 	"github.com/adcondev/ticket-daemon/internal/config"
+	"github.com/adcondev/ticket-daemon/internal/posprinter"
 	"github.com/adcondev/ticket-daemon/internal/server"
 	"github.com/adcondev/ticket-daemon/internal/worker"
 )
@@ -133,7 +134,7 @@ func (p *Program) Start() error {
 			Uptime: int(time.Since(p.startTime).Seconds()),
 		}
 
-		if response.Printers.Status == "error" {
+		if response.Printers.Status == posprinter.StatusError {
 			response.Status = "degraded"
 		}
 
@@ -318,7 +319,7 @@ func serveDashboard(tmpl *template.Template) http.HandlerFunc {
 			return
 		}
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		//nolint:gosec // False positive: passing token to internal template
+
 		data := struct{ AuthToken string }{AuthToken: config.AuthToken}
 		if err := tmpl.Execute(w, data); err != nil {
 			log.Printf("[X] Error rendering dashboard: %v", err)

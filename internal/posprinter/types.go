@@ -1,6 +1,9 @@
 // Package posprinter contains shared types to avoid import cycles.
 package posprinter
 
+const StatusError = "error"
+
+
 // Summary PrinterSummary provides lightweight overview for health checks
 type Summary struct {
 	Status        string `json:"status"` // "ok", "warning", "error"

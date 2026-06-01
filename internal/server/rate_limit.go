@@ -11,6 +11,7 @@ type JobRateLimiter struct {
 	mu        sync.Mutex
 	attempts  map[string][]time.Time
 	maxPerMin int
+	now       func() time.Time
 }
 
 // NewJobRateLimiter creates a limiter allowing maxPerMinute jobs per client.
@@ -18,6 +19,7 @@ func NewJobRateLimiter(maxPerMinute int) *JobRateLimiter {
 	return &JobRateLimiter{
 		attempts:  make(map[string][]time.Time),
 		maxPerMin: maxPerMinute,
+		now:       time.Now,
 	}
 }
 
@@ -26,7 +28,12 @@ func (rl *JobRateLimiter) Allow(clientAddr string) bool {
 	rl.mu.Lock()
 	defer rl.mu.Unlock()
 
-	now := time.Now()
+	var now time.Time
+	if rl.now != nil {
+		now = rl.now()
+	} else {
+		now = time.Now()
+	}
 	cutoff := now.Add(-time.Minute)
 
 	recent := make([]time.Time, 0, rl.maxPerMin)
